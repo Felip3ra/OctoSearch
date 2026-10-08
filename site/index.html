@@ -79,8 +79,28 @@
     .hero-logo img { position: relative; width: min(360px, 80%); height: auto; animation: float 6s ease-in-out infinite; filter: drop-shadow(0 30px 40px #0008); }
     @keyframes float { 50% { transform: translateY(-14px) rotate(-2deg); } }
 
-    .shot { margin: 40px 0 0; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; background: #020617; box-shadow: 0 40px 80px -30px #000c, 0 0 0 1px #22b8f014; }
+    /* Mock window */
+    .mock { margin: 40px auto 0; border-radius: var(--radius); border: 1px solid var(--line); background: #0a1228; overflow: hidden; box-shadow: 0 40px 80px -30px #000c; }
+    .mock-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: #0d1834; }
+    .mock-bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a3a66; }
+    .mock-bar .search { margin-left: 16px; flex: 1; max-width: 420px; padding: 6px 12px; border-radius: 8px; background: #070d1f; border: 1px solid var(--line); font: 12px "JetBrains Mono", monospace; color: var(--muted); }
+    .mock-bar .search b { color: var(--accent); font-weight: 500; }
+    .mock-body { display: grid; grid-template-columns: 220px 1fr; min-height: 300px; }
+    .mock-side { border-right: 1px solid var(--line); padding: 14px; font-size: 13px; color: var(--muted); }
+    .mock-side div { padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mock-side .on { background: #22b8f01a; color: var(--text); }
+    .mock-log { padding: 14px 0; font: 12.5px/1.9 "JetBrains Mono", monospace; overflow: hidden; }
+    .row { padding: 0 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c7d3ee; }
+    .row .t { color: #5d6e96; margin-right: 10px; }
+    .lv { display: inline-block; width: 38px; font-weight: 500; }
+    .lv.err { color: var(--err); } .lv.wrn { color: var(--wrn); } .lv.inf { color: var(--inf); } .lv.dbg { color: var(--dbg); }
+    .row.hl { background: #f43f5e14; box-shadow: inset 3px 0 0 var(--err); }
+    .row mark { background: #22b8f033; color: #fff; border-radius: 3px; padding: 0 2px; }
+    .row.st { color: #6b7ca3; padding-left: 66px; }
+
+    .shot { margin: 0; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; background: #020617; box-shadow: 0 40px 80px -30px #000c, 0 0 0 1px #22b8f014; }
     .shot img { display: block; width: 100%; height: auto; }
+    .shot figcaption { padding: 14px 18px; font-size: 13.5px; color: var(--muted); border-top: 1px solid var(--line); background: #0a1228; }
 
     /* Sections */
     section { padding: 90px 0; }
@@ -133,6 +153,8 @@
       .hero-logo { order: -1; }
       .hero-logo img { width: 200px; }
       .grid, .steps { grid-template-columns: 1fr; }
+      .mock-body { grid-template-columns: 1fr; }
+      .mock-side { display: none; }
       .dl { grid-template-columns: 1fr; padding: 32px 22px; }
       .dl img { display: none; }
       .opts { grid-template-columns: 1fr; }
@@ -146,6 +168,7 @@
     <div class="wrap">
       <a class="brand" href="#"><img src="logo-64.png" alt="" />OctoSearch</a>
       <div class="nav-links">
+        <a href="#interface">Interface</a>
         <a href="#recursos">Recursos</a>
         <a href="#como-funciona">Como funciona</a>
         <a href="#faq">FAQ</a>
@@ -172,10 +195,44 @@
       <div class="hero-logo"><img src="logo-512.png" alt="Mascote do OctoSearch: um polvo detetive com lupa" width="256" height="256" /></div>
     </div>
 
-    <figure class="shot reveal">
-      <img src="screenshot-1440.webp" srcset="screenshot-1440.webp 1440w, screenshot.webp 2880w" sizes="(max-width: 1120px) 100vw, 1080px" width="1440" height="861" alt="OctoSearch exibindo os logs da API, do worker e do gateway mesclados em ordem cronológica, com um erro de timeout destacado" />
-    </figure>
+    <div class="mock reveal" aria-hidden="true">
+      <div class="mock-bar">
+        <i></i><i></i><i></i>
+        <div class="search">+ <b>Timeout</b> &nbsp;− <b>HealthCheck</b></div>
+      </div>
+      <div class="mock-body">
+        <div class="mock-side">
+          <div class="on">📄 api-20261007.log</div>
+          <div>📄 api-20261006.log</div>
+          <div>📄 worker-20261007.log</div>
+          <div>📄 worker-20261006.log</div>
+          <div>📁 gateway/</div>
+        </div>
+        <div class="mock-log">
+          <div class="row"><span class="t">21:14:02.118</span><span class="lv inf">INF</span>Request starting HTTP/1.1 POST /api/orders</div>
+          <div class="row"><span class="t">21:14:02.131</span><span class="lv dbg">DBG</span>Executing handler OrderController.create</div>
+          <div class="row"><span class="t">21:14:07.402</span><span class="lv wrn">WRN</span>Retry 2/3 após <mark>Timeout</mark> no PaymentClient</div>
+          <div class="row hl"><span class="t">21:14:12.877</span><span class="lv err">ERR</span>TimeoutException: The operation has <mark>timed out</mark>.</div>
+          <div class="row st">at PaymentClient.send (payment-client:42)</div>
+          <div class="row st">at OrderService.confirm (order-service:88)</div>
+          <div class="row"><span class="t">21:14:12.880</span><span class="lv inf">INF</span>Request finished HTTP/1.1 POST /api/orders - 500</div>
+          <div class="row"><span class="t">21:14:13.004</span><span class="lv inf">INF</span>Request starting HTTP/1.1 GET /api/orders/42</div>
+        </div>
+      </div>
+    </div>
   </header>
+
+  <section id="interface">
+    <div class="wrap">
+      <div class="eyebrow">Interface</div>
+      <h2>Veja o OctoSearch em ação</h2>
+      <p class="sub">Logs de uma API, de um worker e de um gateway — cada um num formato diferente — mesclados em ordem cronológica, com o erro de timeout destacado.</p>
+      <figure class="shot reveal">
+        <img src="screenshot-1440.webp" srcset="screenshot-1440.webp 1440w, screenshot.webp 2880w" sizes="(max-width: 1120px) 100vw, 1080px" width="1440" height="861" loading="lazy" alt="Tela do OctoSearch exibindo logs da API, do worker e do gateway mesclados, com filtros por nível e um erro destacado" />
+        <figcaption>Tela real do OctoSearch no Windows, com logs de teste.</figcaption>
+      </figure>
+    </div>
+  </section>
 
   <section id="recursos">
     <div class="wrap">
