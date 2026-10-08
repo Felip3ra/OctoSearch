@@ -10,7 +10,7 @@ echo.
 
 REM 1. Fechar processos anteriores
 echo [1/5] Encerrando eventuais processos anteriores...
-taskkill /F /IM "Visualizador de Logs .NET.exe" >nul 2>&1
+taskkill /F /IM "OctoSearch.exe" >nul 2>&1
 taskkill /F /IM "electron.exe" >nul 2>&1
 echo   [OK] Processos verificados.
 
@@ -100,13 +100,13 @@ echo.
 echo ====================================================================
 echo                   CONCLUIDO COM SUCESSO!
 echo ====================================================================
-if exist "dist-exe\Visualizador de Logs .NET.exe" (
+if exist "dist-exe\OctoSearch.exe" (
     echo Executavel portatil criado com sucesso em:
-    echo   dist-exe\Visualizador de Logs .NET.exe
+    echo   dist-exe\OctoSearch.exe
 )
-if exist "dist-exe\win-unpacked\Visualizador de Logs .NET.exe" (
+if exist "dist-exe\win-unpacked\OctoSearch.exe" (
     echo Executavel descompactado pronto em:
-    echo   dist-exe\win-unpacked\Visualizador de Logs .NET.exe
+    echo   dist-exe\win-unpacked\OctoSearch.exe
 )
 echo ====================================================================
 echo.

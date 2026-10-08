@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OctoSearch — Visualizador de logs .NET</title>
-  <meta name="description" content="OctoSearch: leia, pesquise e analise arquivos de log de aplicações .NET no Windows. Download gratuito." />
-  <meta property="og:title" content="OctoSearch — Visualizador de logs .NET" />
-  <meta property="og:description" content="Leia, pesquise e analise logs .NET em segundos. Download gratuito para Windows." />
+  <title>OctoSearch — Visualizador de logs</title>
+  <meta name="description" content="OctoSearch: leia, pesquise e analise qualquer arquivo de log no Windows. Download gratuito." />
+  <meta property="og:title" content="OctoSearch — Visualizador de logs" />
+  <meta property="og:description" content="Leia, pesquise e analise qualquer arquivo de log em segundos. Download gratuito para Windows." />
   <meta property="og:image" content="logo-512.png" />
   <meta name="theme-color" content="#0b1530" />
   <link rel="icon" type="image/png" href="logo-32.png" />
@@ -176,7 +176,7 @@
       <div>
         <span class="pill"><i></i>Versão <span data-version>1.0.0</span> disponível para Windows</span>
         <h1>Encontre o erro no seu log <span>em segundos.</span></h1>
-        <p class="lead">O OctoSearch é um visualizador de logs para aplicações .NET. Abra pastas inteiras, filtre por nível, pesquise com inclusão e exclusão de termos e acompanhe arquivos em tempo real — tudo offline, no seu computador.</p>
+        <p class="lead">O OctoSearch é um visualizador de logs para qualquer aplicação — APIs, serviços, servidores, jobs. Abra pastas inteiras, filtre por nível, pesquise com inclusão e exclusão de termos e acompanhe arquivos em tempo real — tudo offline, no seu computador.</p>
         <div class="cta">
           <a class="btn btn-primary" data-download="installer" href="#download">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
@@ -203,14 +203,14 @@
           <div>📁 gateway/</div>
         </div>
         <div class="mock-log">
-          <div class="row"><span class="t">21:14:02.118</span><span class="lv inf">INF</span>Request starting HTTP/1.1 POST /api/pedidos</div>
-          <div class="row"><span class="t">21:14:02.131</span><span class="lv dbg">DBG</span>Executing endpoint 'PedidosController.Criar'</div>
+          <div class="row"><span class="t">21:14:02.118</span><span class="lv inf">INF</span>Request starting HTTP/1.1 POST /api/orders</div>
+          <div class="row"><span class="t">21:14:02.131</span><span class="lv dbg">DBG</span>Executing handler OrderController.create</div>
           <div class="row"><span class="t">21:14:07.402</span><span class="lv wrn">WRN</span>Retry 2/3 após <mark>Timeout</mark> no PaymentClient</div>
-          <div class="row hl"><span class="t">21:14:12.877</span><span class="lv err">ERR</span>System.TimeoutException: The operation has <mark>timed out</mark>.</div>
-          <div class="row st">at PaymentClient.SendAsync(HttpRequestMessage request)</div>
-          <div class="row st">at PedidosService.ConfirmarAsync(Guid pedidoId) in PedidosService.cs:line 88</div>
-          <div class="row"><span class="t">21:14:12.880</span><span class="lv inf">INF</span>Request finished HTTP/1.1 POST /api/pedidos - 500</div>
-          <div class="row"><span class="t">21:14:13.004</span><span class="lv inf">INF</span>Request starting HTTP/1.1 GET /api/pedidos/42</div>
+          <div class="row hl"><span class="t">21:14:12.877</span><span class="lv err">ERR</span>TimeoutException: The operation has <mark>timed out</mark>.</div>
+          <div class="row st">at PaymentClient.send (payment-client:42)</div>
+          <div class="row st">at OrderService.confirm (order-service:88)</div>
+          <div class="row"><span class="t">21:14:12.880</span><span class="lv inf">INF</span>Request finished HTTP/1.1 POST /api/orders - 500</div>
+          <div class="row"><span class="t">21:14:13.004</span><span class="lv inf">INF</span>Request starting HTTP/1.1 GET /api/orders/42</div>
         </div>
       </div>
     </div>
@@ -220,7 +220,7 @@
     <div class="wrap">
       <div class="eyebrow">Recursos</div>
       <h2>Tudo o que você precisa para investigar logs</h2>
-      <p class="sub">Feito para quem passa o dia caçando exceções em arquivos .log e .txt gerados por Serilog, NLog, log4net e companhia.</p>
+      <p class="sub">Feito para quem passa o dia caçando erros em arquivos .log e .txt — de qualquer linguagem, framework ou servidor.</p>
       <div class="grid">
         <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><h3>Pesquisa com inclusão e exclusão</h3><p>Enter inclui um termo, Shift+Enter exclui. Combine vários filtros e esconda o ruído na hora.</p></div>
         <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg></div><h3>Filtro por nível</h3><p>Veja só ERR, WRN, INF ou DBG com um clique. A stack trace acompanha cada registro.</p></div>
@@ -278,7 +278,7 @@
       <h2>Perguntas frequentes</h2>
       <details><summary>O OctoSearch é gratuito?</summary><p>Sim. Você pode baixar e usar sem custo.</p></details>
       <details><summary>Meus logs são enviados para a internet?</summary><p>Não. O aplicativo roda 100% no seu computador e lê os arquivos diretamente do disco.</p></details>
-      <details><summary>Quais formatos de arquivo são suportados?</summary><p>Arquivos .log e .txt, incluindo arquivos rotacionados como app.log.1. Os níveis são reconhecidos nos formatos mais comuns de Serilog, NLog e Microsoft.Extensions.Logging.</p></details>
+      <details><summary>Quais formatos de arquivo são suportados?</summary><p>Arquivos .log e .txt, incluindo arquivos rotacionados como app.log.1. Data, hora e nível (ERROR, WARN, INFO, DEBUG…) são reconhecidos automaticamente nos formatos mais comuns, inclusive logs em JSON. Arquivos em outros formatos são exibidos linha a linha, com busca e filtros normalmente.</p></details>
       <details><summary>Funciona com pastas de rede?</summary><p>Sim. A varredura é assíncrona e percorre subpastas sem travar a janela.</p></details>
       <details><summary>Por que o Windows mostra um aviso ao abrir?</summary><p>O instalador ainda não tem assinatura digital, então o SmartScreen pode alertar na primeira execução. Clique em “Mais informações” e depois em “Executar assim mesmo”.</p></details>
     </div>
@@ -287,7 +287,7 @@
   <footer>
     <div class="wrap">
       <a class="brand" href="#"><img src="logo-64.png" alt="" />OctoSearch</a>
-      <span>© <span id="year">2026</span> Felipe Santos. Feito com 🐙 para devs .NET.</span>
+      <span>© <span id="year">2026</span> Felipe Santos. Feito com 🐙 para quem vive de logs.</span>
     </div>
   </footer>
 

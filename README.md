@@ -1,7 +1,7 @@
 <div align="center">
   <img src="site/logo-256.png" width="128" alt="OctoSearch" />
   <h1>OctoSearch</h1>
-  <p>Visualizador e pesquisador de arquivos de log de aplicações .NET para Windows.</p>
+  <p>Visualizador e pesquisador de arquivos de log para Windows — qualquer aplicação, linguagem ou servidor.</p>
   <p><a href="https://github.com/Felip3ra/OctoSearch/releases/latest/download/OctoSearch-Setup.exe"><b>⬇ Baixar para Windows</b></a></p>
 </div>
 

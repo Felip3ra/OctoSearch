@@ -1,8 +1,8 @@
 @echo off
 cd /d "%~dp0"
-title Terminal - Visualizador de Logs .NET
+title Terminal - OctoSearch
 echo ====================================================================
-echo      TERMINAL DE APOIO - VISUALIZADOR DE LOGS .NET
+echo      TERMINAL DE APOIO - OCTOSEARCH
 echo ====================================================================
 echo.
 echo Esta janela nunca fecha automaticamente.
