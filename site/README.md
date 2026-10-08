@@ -11,16 +11,14 @@ O instalador tem ~113 MB e a Vercel não aceita arquivos acima de 100 MB, então
 3. Crie um token em GitHub → Settings → Developer settings → Personal access tokens (permissão *Contents: write* no repositório).
 4. Rode `publicar-atualizacao.bat` na raiz do projeto: ele gera o instalador e o portátil e cria a release com o `latest.yml` usado pela atualização automática.
 
-## 2. Publique o site na Vercel
+## 2. Site na Vercel
 
-Opção A — pelo painel: em vercel.com → **Add New → Project**, importe o repositório e defina
-**Root Directory = `site`**, Framework Preset = **Other**. Clique em Deploy.
+O projeto `octosearch` na Vercel está ligado ao repositório `Felip3ra/OctoSearch` com
+**Root Directory = `site`** e Framework Preset = **Other** (sem build).
+Todo `git push` na branch `main` publica o site automaticamente em https://octosearch-omega.vercel.app.
 
-Opção B — pela linha de comando, dentro desta pasta:
-
-```bash
-npx vercel --prod
-```
+> Se a Root Directory voltar para a raiz, a Vercel passa a publicar a versão web do app
+> no lugar da landing page — confira em Settings → Build and Deployment.
 
 ## Nova versão (atualização automática)
 
