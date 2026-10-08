@@ -1,0 +1,41 @@
+@import "tailwindcss" source(none);
+@source "./";
+@source "../index.html";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", "JetBrains Mono", "Fira Code", Consolas, ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: #f1f5f9;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root.dark body {
+  background-color: #020617;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.45) transparent;
+}
+
+:root.dark * {
+  scrollbar-color: rgb(71 85 105 / 0.7) transparent;
+}
+
+::selection {
+  background-color: rgb(14 165 233 / 0.25);
+}

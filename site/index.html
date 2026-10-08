@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OctoSearch — Visualizador de logs .NET</title>
+  <meta name="description" content="OctoSearch: leia, pesquise e analise arquivos de log de aplicações .NET no Windows. Download gratuito." />
+  <meta property="og:title" content="OctoSearch — Visualizador de logs .NET" />
+  <meta property="og:description" content="Leia, pesquise e analise logs .NET em segundos. Download gratuito para Windows." />
+  <meta property="og:image" content="logo-512.png" />
+  <meta name="theme-color" content="#0b1530" />
+  <link rel="icon" type="image/png" href="logo-32.png" />
+  <link rel="apple-touch-icon" href="logo-256.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070d1f;
+      --bg-2: #0b1530;
+      --card: #0f1c3d;
+      --line: #1d2f5c;
+      --text: #e6eeff;
+      --muted: #93a4c8;
+      --accent: #22b8f0;
+      --accent-2: #1e6fe0;
+      --err: #f43f5e;
+      --wrn: #f5b82e;
+      --inf: #38bdf8;
+      --dbg: #94a3b8;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 600px at 70% -10%, #12306b55, transparent 60%), var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+    /* Nav */
+    nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); background: #070d1fcc; border-bottom: 1px solid #ffffff0d; }
+    nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; font-size: 18px; }
+    .brand img { width: 34px; height: 34px; }
+    .nav-links { display: flex; gap: 28px; align-items: center; font-size: 14px; color: var(--muted); }
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 15px;
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease; cursor: pointer; border: 0;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 10px 30px -10px #22b8f0aa; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 40px -12px #22b8f0cc; }
+    .btn-ghost { background: #ffffff0a; border: 1px solid var(--line); color: var(--text); }
+    .btn-ghost:hover { background: #ffffff14; }
+    .btn-sm { padding: 9px 16px; font-size: 14px; border-radius: 10px; }
+    .btn svg { width: 18px; height: 18px; }
+
+    /* Hero */
+    .hero { padding: 80px 0 40px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
+    .pill { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; background: #22b8f014; border: 1px solid #22b8f033; color: #7fd6f7; font-size: 13px; font-weight: 500; }
+    .pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+    h1 { font-size: clamp(36px, 5.5vw, 60px); line-height: 1.05; letter-spacing: -.035em; margin: 20px 0 18px; font-weight: 800; }
+    h1 span { background: linear-gradient(90deg, #5fd3ff, #3b82f6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lead { font-size: 18px; color: var(--muted); max-width: 540px; margin: 0 0 32px; }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+    .meta { margin-top: 16px; font-size: 13px; color: var(--muted); display: flex; gap: 16px; flex-wrap: wrap; }
+    .meta span::before { content: "✓ "; color: var(--accent); }
+    .hero-logo { position: relative; display: grid; place-items: center; }
+    .hero-logo::before { content: ""; position: absolute; inset: 10%; background: radial-gradient(circle, #22b8f055, transparent 65%); filter: blur(30px); }
+    .hero-logo img { position: relative; width: min(360px, 80%); height: auto; animation: float 6s ease-in-out infinite; filter: drop-shadow(0 30px 40px #0008); }
+    @keyframes float { 50% { transform: translateY(-14px) rotate(-2deg); } }
+
+    /* Mock window */
+    .mock { margin: 40px auto 0; border-radius: var(--radius); border: 1px solid var(--line); background: #0a1228; overflow: hidden; box-shadow: 0 40px 80px -30px #000c; }
+    .mock-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: #0d1834; }
+    .mock-bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a3a66; }
+    .mock-bar .search { margin-left: 16px; flex: 1; max-width: 420px; padding: 6px 12px; border-radius: 8px; background: #070d1f; border: 1px solid var(--line); font: 12px "JetBrains Mono", monospace; color: var(--muted); }
+    .mock-bar .search b { color: var(--accent); font-weight: 500; }
+    .mock-body { display: grid; grid-template-columns: 220px 1fr; min-height: 300px; }
+    .mock-side { border-right: 1px solid var(--line); padding: 14px; font-size: 13px; color: var(--muted); }
+    .mock-side div { padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mock-side .on { background: #22b8f01a; color: var(--text); }
+    .mock-log { padding: 14px 0; font: 12.5px/1.9 "JetBrains Mono", monospace; overflow: hidden; }
+    .row { padding: 0 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c7d3ee; }
+    .row .t { color: #5d6e96; margin-right: 10px; }
+    .lv { display: inline-block; width: 38px; font-weight: 500; }
+    .lv.err { color: var(--err); } .lv.wrn { color: var(--wrn); } .lv.inf { color: var(--inf); } .lv.dbg { color: var(--dbg); }
+    .row.hl { background: #f43f5e14; box-shadow: inset 3px 0 0 var(--err); }
+    .row mark { background: #22b8f033; color: #fff; border-radius: 3px; padding: 0 2px; }
+    .row.st { color: #6b7ca3; padding-left: 66px; }
+
+    /* Sections */
+    section { padding: 90px 0; }
+    .eyebrow { color: var(--accent); font-weight: 600; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
+    h2 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -.03em; line-height: 1.15; margin: 10px 0 14px; }
+    .sub { color: var(--muted); max-width: 620px; margin: 0 0 48px; font-size: 17px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card { background: linear-gradient(180deg, #10204599, #0b163299); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; transition: border-color .2s, transform .2s; }
+    .card:hover { border-color: #22b8f066; transform: translateY(-3px); }
+    .card .ic { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; background: #22b8f01a; color: var(--accent); margin-bottom: 16px; }
+    .card .ic svg { width: 22px; height: 22px; }
+    .card h3 { margin: 0 0 6px; font-size: 17px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: s; }
+    .step { padding: 26px; border-radius: var(--radius); border: 1px dashed var(--line); }
+    .step::before { counter-increment: s; content: counter(s); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #04122b; font-weight: 800; margin-bottom: 14px; }
+    .step h3 { margin: 0 0 6px; font-size: 17px; }
+    .step p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+    /* Download */
+    .dl { position: relative; overflow: hidden; border-radius: 24px; border: 1px solid #22b8f044; background: radial-gradient(600px 300px at 85% 0%, #1e6fe055, transparent 70%), linear-gradient(180deg, #0f1f47, #0a1430); padding: 56px; display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center; }
+    .dl h2 { margin-top: 0; }
+    .dl .sub { margin-bottom: 28px; }
+    .dl img { width: 200px; height: auto; }
+    .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 620px; }
+    .opt { border: 1px solid var(--line); border-radius: 14px; padding: 18px; background: #070d1f88; display: flex; flex-direction: column; gap: 12px; }
+    .opt strong { font-size: 15px; }
+    .opt small { color: var(--muted); font-size: 13px; }
+    .req { margin-top: 22px; font-size: 13px; color: var(--muted); }
+
+    details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+    summary { cursor: pointer; font-weight: 600; font-size: 16px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+    summary::after { content: "+"; color: var(--accent); font-size: 22px; line-height: 1; }
+    details[open] summary::after { content: "–"; }
+    details p { color: var(--muted); margin: 10px 0 0; }
+    .faq { max-width: 760px; }
+
+    footer { border-top: 1px solid #ffffff0d; padding: 32px 0; color: var(--muted); font-size: 14px; }
+    footer .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } .hero-logo img { animation: none; } }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; padding-top: 48px; text-align: center; }
+      .hero .lead { margin-left: auto; margin-right: auto; }
+      .cta, .meta { justify-content: center; }
+      .hero-logo { order: -1; }
+      .hero-logo img { width: 200px; }
+      .grid, .steps { grid-template-columns: 1fr; }
+      .mock-body { grid-template-columns: 1fr; }
+      .mock-side { display: none; }
+      .dl { grid-template-columns: 1fr; padding: 32px 22px; }
+      .dl img { display: none; }
+      .opts { grid-template-columns: 1fr; }
+      .nav-links a:not(.btn) { display: none; }
+      section { padding: 64px 0; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="wrap">
+      <a class="brand" href="#"><img src="logo-64.png" alt="" />OctoSearch</a>
+      <div class="nav-links">
+        <a href="#recursos">Recursos</a>
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#faq">FAQ</a>
+        <a class="btn btn-primary btn-sm" href="#download">Baixar grátis</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="wrap">
+    <div class="hero">
+      <div>
+        <span class="pill"><i></i>Versão <span data-version>1.0.0</span> disponível para Windows</span>
+        <h1>Encontre o erro no seu log <span>em segundos.</span></h1>
+        <p class="lead">O OctoSearch é um visualizador de logs para aplicações .NET. Abra pastas inteiras, filtre por nível, pesquise com inclusão e exclusão de termos e acompanhe arquivos em tempo real — tudo offline, no seu computador.</p>
+        <div class="cta">
+          <a class="btn btn-primary" data-download="installer" href="#download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+            Baixar para Windows
+          </a>
+          <a class="btn btn-ghost" href="#recursos">Ver recursos</a>
+        </div>
+        <div class="meta"><span>Gratuito</span><span>100% offline</span><span>Windows 10 e 11</span></div>
+      </div>
+      <div class="hero-logo"><img src="logo-512.png" alt="Mascote do OctoSearch: um polvo detetive com lupa" width="256" height="256" /></div>
+    </div>
+
+    <div class="mock reveal" aria-hidden="true">
+      <div class="mock-bar">
+        <i></i><i></i><i></i>
+        <div class="search">+ <b>Timeout</b> &nbsp;− <b>HealthCheck</b></div>
+      </div>
+      <div class="mock-body">
+        <div class="mock-side">
+          <div class="on">📄 api-20261007.log</div>
+          <div>📄 api-20261006.log</div>
+          <div>📄 worker-20261007.log</div>
+          <div>📄 worker-20261006.log</div>
+          <div>📁 gateway/</div>
+        </div>
+        <div class="mock-log">
+          <div class="row"><span class="t">21:14:02.118</span><span class="lv inf">INF</span>Request starting HTTP/1.1 POST /api/pedidos</div>
+          <div class="row"><span class="t">21:14:02.131</span><span class="lv dbg">DBG</span>Executing endpoint 'PedidosController.Criar'</div>
+          <div class="row"><span class="t">21:14:07.402</span><span class="lv wrn">WRN</span>Retry 2/3 após <mark>Timeout</mark> no PaymentClient</div>
+          <div class="row hl"><span class="t">21:14:12.877</span><span class="lv err">ERR</span>System.TimeoutException: The operation has <mark>timed out</mark>.</div>
+          <div class="row st">at PaymentClient.SendAsync(HttpRequestMessage request)</div>
+          <div class="row st">at PedidosService.ConfirmarAsync(Guid pedidoId) in PedidosService.cs:line 88</div>
+          <div class="row"><span class="t">21:14:12.880</span><span class="lv inf">INF</span>Request finished HTTP/1.1 POST /api/pedidos - 500</div>
+          <div class="row"><span class="t">21:14:13.004</span><span class="lv inf">INF</span>Request starting HTTP/1.1 GET /api/pedidos/42</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="recursos">
+    <div class="wrap">
+      <div class="eyebrow">Recursos</div>
+      <h2>Tudo o que você precisa para investigar logs</h2>
+      <p class="sub">Feito para quem passa o dia caçando exceções em arquivos .log e .txt gerados por Serilog, NLog, log4net e companhia.</p>
+      <div class="grid">
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><h3>Pesquisa com inclusão e exclusão</h3><p>Enter inclui um termo, Shift+Enter exclui. Combine vários filtros e esconda o ruído na hora.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg></div><h3>Filtro por nível</h3><p>Veja só ERR, WRN, INF ou DBG com um clique. A stack trace acompanha cada registro.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h7v7H4zM13 13h7v7h-7zM13 4h7v7h-7zM4 13h7v7H4z"/></svg></div><h3>Vários arquivos juntos</h3><p>Selecione vários logs e veja tudo mesclado em ordem cronológica, cada origem com sua cor.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h6l2 2h10v10H3z"/></svg></div><h3>Pastas inteiras e salvas</h3><p>Abra uma pasta e o OctoSearch encontra os logs nas subpastas. Salve suas pastas favoritas em abas.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg></div><h3>Marcadores coloridos</h3><p>Crie regras que destacam linhas por texto — IDs de pedido, usuários, endpoints críticos.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div><h3>Rápido com arquivos grandes</h3><p>Renderização virtualizada, auto-rolagem que acompanha a última linha e modo claro/escuro.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="como-funciona">
+    <div class="wrap">
+      <div class="eyebrow">Como funciona</div>
+      <h2>Do download ao primeiro erro em 1 minuto</h2>
+      <p class="sub">Sem cadastro, sem servidor, sem enviar seus logs para lugar nenhum.</p>
+      <div class="steps">
+        <div class="step reveal"><h3>Baixe o instalador</h3><p>Clique em “Baixar para Windows” e execute o arquivo OctoSearch-Setup.</p></div>
+        <div class="step reveal"><h3>Escolha uma pasta</h3><p>Aponte para a pasta de logs da sua aplicação — local ou de rede.</p></div>
+        <div class="step reveal"><h3>Pesquise e filtre</h3><p>Use a busca, os níveis e os marcadores para chegar na causa do problema.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <div class="dl reveal">
+        <div>
+          <div class="eyebrow">Download gratuito</div>
+          <h2>Baixe o OctoSearch</h2>
+          <p class="sub">Versão <span data-version>1.0.0</span> para Windows 64 bits · <span data-size>113 MB</span></p>
+          <div class="opts">
+            <div class="opt">
+              <div><strong>Instalador</strong><br /><small>Recomendado. Cria atalhos no menu Iniciar e na área de trabalho.</small></div>
+              <a class="btn btn-primary" data-download="installer" href="#">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+                Baixar instalador
+              </a>
+            </div>
+            <div class="opt">
+              <div><strong>Portátil</strong><br /><small>Um único .exe, sem instalação. Ideal para pen drive ou servidores.</small></div>
+              <a class="btn btn-ghost" data-download="portable" href="#">Baixar portátil</a>
+            </div>
+          </div>
+          <p class="req">Requisitos: Windows 10 ou 11 (64 bits). Se o Windows SmartScreen exibir um aviso, clique em “Mais informações” → “Executar assim mesmo”.</p>
+        </div>
+        <img src="logo-256.png" alt="" />
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap faq">
+      <div class="eyebrow">FAQ</div>
+      <h2>Perguntas frequentes</h2>
+      <details><summary>O OctoSearch é gratuito?</summary><p>Sim. Você pode baixar e usar sem custo.</p></details>
+      <details><summary>Meus logs são enviados para a internet?</summary><p>Não. O aplicativo roda 100% no seu computador e lê os arquivos diretamente do disco.</p></details>
+      <details><summary>Quais formatos de arquivo são suportados?</summary><p>Arquivos .log e .txt, incluindo arquivos rotacionados como app.log.1. Os níveis são reconhecidos nos formatos mais comuns de Serilog, NLog e Microsoft.Extensions.Logging.</p></details>
+      <details><summary>Funciona com pastas de rede?</summary><p>Sim. A varredura é assíncrona e percorre subpastas sem travar a janela.</p></details>
+      <details><summary>Por que o Windows mostra um aviso ao abrir?</summary><p>O instalador ainda não tem assinatura digital, então o SmartScreen pode alertar na primeira execução. Clique em “Mais informações” e depois em “Executar assim mesmo”.</p></details>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <a class="brand" href="#"><img src="logo-64.png" alt="" />OctoSearch</a>
+      <span>© <span id="year">2026</span> Felipe Santos. Feito com 🐙 para devs .NET.</span>
+    </div>
+  </footer>
+
+  <script src="config.js"></script>
+  <script>
+    (function () {
+      var c = window.OCTO_CONFIG || {};
+      document.querySelectorAll('[data-download]').forEach(function (a) {
+        var url = a.dataset.download === 'portable' ? c.portableUrl : c.installerUrl;
+        if (url) { a.href = url; a.setAttribute('rel', 'noopener'); }
+      });
+      if (c.version) document.querySelectorAll('[data-version]').forEach(function (el) { el.textContent = c.version; });
+      if (c.sizeLabel) document.querySelectorAll('[data-size]').forEach(function (el) { el.textContent = c.sizeLabel; });
+      document.getElementById('year').textContent = new Date().getFullYear();
+
+      var items = document.querySelectorAll('.reveal');
+      if (!('IntersectionObserver' in window)) { items.forEach(function (el) { el.classList.add('in'); }); return; }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+      }, { threshold: 0.12 });
+      items.forEach(function (el) { io.observe(el); });
+    })();
+  </script>
+</body>
+</html>

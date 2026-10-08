@@ -1,0 +1,15 @@
+node_modules/
+build/
+dist/
+dist-exe/
+dist-exe-updated/
+coverage/
+tmp/
+.scannerwork/
+.claude/
+apresentacao-sonarqube/
+.DS_Store
+*.log
+.env*
+!.env.example
+.vercel

@@ -1,0 +1,88 @@
+{
+  "name": "visualizador-de-logs-net",
+  "private": true,
+  "version": "1.0.0",
+  "description": "OctoSearch - visualizador e pesquisador de arquivos de log",
+  "author": "Felipe Santos",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "node -e \"for (const d of ['dist','dist-exe']) require('node:fs').rmSync(d,{recursive:true,force:true})\"",
+    "lint": "tsc --noEmit",
+    "desktop": "electron .",
+    "build:exe": "vite build && electron-builder --win portable",
+    "build:installer": "vite build && electron-builder --win nsis",
+    "release": "vite build && electron-builder --win nsis --publish always && electron-builder --win portable --publish always"
+  },
+  "build": {
+    "appId": "com.octosearch.desktop",
+    "productName": "OctoSearch",
+    "artifactName": "OctoSearch.${ext}",
+    "directories": {
+      "output": "dist-exe"
+    },
+    "win": {
+      "icon": "electron/icon.ico",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "OctoSearch-Setup.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "OctoSearch",
+      "uninstallDisplayName": "OctoSearch",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Felip3ra",
+        "repo": "OctoSearch",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
+    "lucide-react": "^0.546.0",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}

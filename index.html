@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OctoSearch</title>
+    <meta name="description" content="OctoSearch: aplicativo para leitura, pesquisa e análise de arquivos de log." />
+    <meta property="og:title" content="OctoSearch" />
+    <meta property="og:description" content="Aplicativo para leitura, pesquisa e análise de arquivos de log." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      try {
+        const savedTheme = localStorage.getItem('log-viewer-theme');
+        const useDarkTheme = savedTheme
+          ? savedTheme === 'dark'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', useDarkTheme);
+        document.documentElement.style.colorScheme = useDarkTheme ? 'dark' : 'light';
+      } catch (_) {
+        // The application still works if browser storage is unavailable.
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
