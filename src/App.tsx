@@ -13,7 +13,7 @@ import {
   SortDirection,
 } from './types';
 import { parseLogContentAsync } from './services/logParser';
-import { filterLogEntries } from './services/logSearch';
+import { filterLogEntries, getIncludeBlocks } from './services/logSearch';
 import { getSourceColor, mergeLogSources } from './services/logMerge';
 import { sortFilesByName } from './utils/fileSorter';
 import {
@@ -713,19 +713,81 @@ export default function App() {
       ),
     }));
 
-  const toggleIncludeOperator = () =>
-    updateActiveTab((tab) => ({ ...tab, includeOperator: (tab.includeOperator || 'or') === 'or' ? 'and' : 'or' }));
+  // Flips the connector between this included term and the previous one.
+  const toggleConnector = (filterId: string) =>
+    updateActiveTab((tab) => ({
+      ...tab,
+      searchFilters: (tab.searchFilters || []).map((filter) => {
+        if (filter.id !== filterId) return filter;
+        const current = filter.connector ?? tab.includeOperator ?? 'or';
+        return { ...filter, connector: current === 'or' ? 'and' : 'or' };
+      }),
+    }));
+
+  const includeBlocks = useMemo(() => getIncludeBlocks(searchFilters, includeOperator), [searchFilters, includeOperator]);
+  const excludeFilters = useMemo(() => searchFilters.filter((filter) => filter.mode === 'exclude'), [searchFilters]);
 
   const applySavedFilter = (saved: SavedFilter) => {
     updateActiveTab((tab) => ({
       ...tab,
       searchTerm: '',
-      searchFilters: cloneFilterTerms(saved),
-      includeOperator: saved.includeOperator,
+      // Older saved filters only have one operator for all terms: turn it into per-term connectors.
+      searchFilters: cloneFilterTerms(saved).map((filter) => ({ ...filter, connector: filter.connector ?? saved.includeOperator })),
+      includeOperator: 'or',
       levelFilter: saved.levelFilter,
     }));
     setIsSavedFiltersModalOpen(false);
   };
+
+  const renderConnector = (filter: SearchFilter, operator: 'and' | 'or') => (
+    <button
+      type="button"
+      onClick={() => toggleConnector(filter.id)}
+      title={
+        operator === 'and'
+          ? 'E: o registro precisa conter os dois termos. Clique para trocar para OU'
+          : 'OU: basta o registro conter um dos lados. Clique para trocar para E'
+      }
+      className={`shrink-0 cursor-pointer rounded border px-1.5 py-px text-[10px] font-bold uppercase tracking-wide transition-colors ${
+        operator === 'and'
+          ? 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300'
+          : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
+      }`}
+    >
+      {operator === 'and' ? 'e' : 'ou'}
+    </button>
+  );
+
+  const renderFilterChip = (filter: SearchFilter) => (
+    <span
+      className={`flex shrink-0 items-center overflow-hidden rounded-full border font-medium ${
+        filter.mode === 'exclude'
+          ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => toggleSearchFilterMode(filter.id)}
+        title={filter.mode === 'exclude' ? 'Clique para incluir este termo em vez de excluir' : 'Clique para excluir este termo em vez de incluir'}
+        className={`flex cursor-pointer items-center gap-1 py-0.5 pl-2.5 pr-1 transition-colors ${
+          filter.mode === 'exclude' ? 'hover:bg-rose-100 dark:hover:bg-rose-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+        }`}
+      >
+        {filter.mode === 'exclude' ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+        <span className="font-mono">{filter.text}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => removeSearchFilter(filter.id)}
+        title="Remover filtro"
+        aria-label={`Remover filtro ${filter.text}`}
+        className="cursor-pointer py-0.5 pl-0.5 pr-2 opacity-50 transition-opacity hover:opacity-100"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
 
   const clearSearchFilters = () => updateActiveTab((tab) => ({ ...tab, searchTerm: '', searchFilters: [] }));
   const setLevelFilter = (level: LogLevel) => updateActiveTab((tab) => ({ ...tab, levelFilter: level }));
@@ -982,7 +1044,7 @@ export default function App() {
                     type="button"
                     onClick={() => addSearchFilter('include')}
                     disabled={!searchTerm.trim()}
-                    title="Mostrar registros que contêm este texto. Vários termos incluídos combinam com OU ou E (clique no conector entre eles para alternar) (Enter)"
+                    title="Mostrar registros que contêm este texto. Clique no conector entre os termos para alternar entre OU e E (E agrupa primeiro) (Enter)"
                     className="flex items-center gap-1 px-2.5 text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
                   >
                     <Plus className="h-3.5 w-3.5" /> Incluir
@@ -1193,65 +1255,35 @@ export default function App() {
           {/* Active filter chips */}
           {(hasActiveFilters || enabledHighlightRules.length > 0) && (
             <div className="flex min-h-10 items-center gap-1.5 overflow-x-auto border-b border-slate-200 px-3 py-1.5 text-[11px] dark:border-slate-800">
-              {[
-                ...searchFilters.filter((filter) => filter.mode === 'include'),
-                ...searchFilters.filter((filter) => filter.mode === 'exclude'),
-              ].map((filter, index, ordered) => (
+              {includeBlocks.map((block, blockIndex) => {
+                const chips = block.map((filter, termIndex) => (
+                  <React.Fragment key={filter.id}>
+                    {termIndex > 0 && renderConnector(filter, 'and')}
+                    {renderFilterChip(filter)}
+                  </React.Fragment>
+                ));
+                return (
+                  <React.Fragment key={block[0].id}>
+                    {blockIndex > 0 && renderConnector(block[0], 'or')}
+                    {includeBlocks.length > 1 && block.length > 1 ? (
+                      <span
+                        className="flex shrink-0 items-center gap-1 rounded-lg border border-dashed border-violet-300 bg-violet-50/50 px-1 py-0.5 dark:border-violet-800 dark:bg-violet-950/20"
+                        title="Bloco E: o registro precisa conter todos estes termos"
+                      >
+                        {chips}
+                      </span>
+                    ) : (
+                      chips
+                    )}
+                  </React.Fragment>
+                );
+              })}
+              {excludeFilters.map((filter, index) => (
                 <React.Fragment key={filter.id}>
-                {index > 0 && filter.mode === 'include' && (
-                  <button
-                    type="button"
-                    onClick={toggleIncludeOperator}
-                    title={
-                      includeOperator === 'and'
-                        ? 'E: o registro precisa conter todos os termos incluídos. Clique para trocar para OU'
-                        : 'OU: basta o registro conter um dos termos incluídos. Clique para trocar para E'
-                    }
-                    className={`shrink-0 cursor-pointer rounded border px-1.5 py-px text-[10px] font-bold uppercase tracking-wide transition-colors ${
-                      includeOperator === 'and'
-                        ? 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300'
-                        : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    {includeOperator === 'and' ? 'e' : 'ou'}
-                  </button>
-                )}
-                {index > 0 && filter.mode === 'exclude' && (
                   <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    {ordered[index - 1].mode === 'include' ? 'e não' : 'nem'}
+                    {index > 0 ? 'nem' : includeBlocks.length > 0 ? 'e não' : 'sem'}
                   </span>
-                )}
-                {index === 0 && filter.mode === 'exclude' && (
-                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">sem</span>
-                )}
-                <span
-                  className={`flex shrink-0 items-center overflow-hidden rounded-full border font-medium ${
-                    filter.mode === 'exclude'
-                      ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSearchFilterMode(filter.id)}
-                    title={filter.mode === 'exclude' ? 'Clique para incluir este termo em vez de excluir' : 'Clique para excluir este termo em vez de incluir'}
-                    className={`flex cursor-pointer items-center gap-1 py-0.5 pl-2.5 pr-1 transition-colors ${
-                      filter.mode === 'exclude' ? 'hover:bg-rose-100 dark:hover:bg-rose-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                    }`}
-                  >
-                    {filter.mode === 'exclude' ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                    <span className="font-mono">{filter.text}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeSearchFilter(filter.id)}
-                    title="Remover filtro"
-                    aria-label={`Remover filtro ${filter.text}`}
-                    className="cursor-pointer py-0.5 pl-0.5 pr-2 opacity-50 transition-opacity hover:opacity-100"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
+                  {renderFilterChip(filter)}
                 </React.Fragment>
               ))}
               {levelFilter !== 'ALL' && (

@@ -1,13 +1,18 @@
 export type LogLevel = 'ALL' | 'INF' | 'WRN' | 'ERR' | 'DBG' | 'OTHER';
 export type EntryLogLevel = 'INF' | 'WRN' | 'ERR' | 'DBG' | 'OTHER';
 export type SearchMode = 'include' | 'exclude';
-/** How included terms combine: 'or' needs any of them, 'and' needs all of them. */
+/** How two included terms combine: 'or' needs either of them, 'and' needs both. */
 export type FilterOperator = 'or' | 'and';
 
 export interface SearchFilter {
   id: string;
   text: string;
   mode: SearchMode;
+  /**
+   * How an included term joins the included term before it. AND binds tighter than OR,
+   * so "a E b OU c" means "(a E b) OU c". Missing means the tab/saved default operator.
+   */
+  connector?: FilterOperator;
 }
 
 export interface LogEntry {

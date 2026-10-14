@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { FilterOperator, LogLevel, SavedFilter, SearchFilter } from '../types';
 import { findSavedFilter, listFilterGroups, upsertSavedFilter } from '../services/filterStorage';
+import { getIncludeBlocks } from '../services/logSearch';
 
 interface SavedFiltersModalProps {
   isOpen: boolean;
@@ -42,30 +43,43 @@ const inputClass =
 
 const groupKey = (group: string) => group.trim().toLocaleLowerCase('pt-BR');
 
-/** Compact read-only rendering of a filter set: "+a ou +b · sem −c · Nível ERR". */
+/** Compact read-only rendering of a filter set: "(+a e +b) ou +c · e não −d · Nível ERR". */
 export function FilterSummary({
   filters,
   operator,
   level,
 }: Readonly<{ filters: SearchFilter[]; operator: FilterOperator; level: LogLevel }>) {
-  const includes = filters.filter((filter) => filter.mode === 'include');
+  const blocks = getIncludeBlocks(filters, operator);
   const excludes = filters.filter((filter) => filter.mode === 'exclude');
-  const connector = operator === 'and' ? 'e' : 'ou';
+  const connectorClass = 'font-semibold uppercase text-slate-400';
+  const term = (filter: SearchFilter) => (
+    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 font-mono text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300">
+      +{filter.text}
+    </span>
+  );
 
   return (
     <div className="flex flex-wrap items-center gap-1 text-[10px]">
-      {includes.map((filter, index) => (
-        <React.Fragment key={filter.id}>
-          {index > 0 && <span className="font-semibold uppercase text-slate-400">{connector}</span>}
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 font-mono text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300">
-            +{filter.text}
-          </span>
-        </React.Fragment>
-      ))}
+      {blocks.map((block, blockIndex) => {
+        const grouped = blocks.length > 1 && block.length > 1;
+        return (
+          <React.Fragment key={block[0].id}>
+            {blockIndex > 0 && <span className={connectorClass}>ou</span>}
+            {grouped && <span className="text-slate-400">(</span>}
+            {block.map((filter, termIndex) => (
+              <React.Fragment key={filter.id}>
+                {termIndex > 0 && <span className={`${connectorClass} text-violet-500 dark:text-violet-400`}>e</span>}
+                {term(filter)}
+              </React.Fragment>
+            ))}
+            {grouped && <span className="text-slate-400">)</span>}
+          </React.Fragment>
+        );
+      })}
       {excludes.map((filter, index) => (
         <React.Fragment key={filter.id}>
           <span className="font-semibold uppercase text-slate-400">
-            {index === 0 ? (includes.length > 0 ? 'e não' : 'sem') : 'nem'}
+            {index === 0 ? (blocks.length > 0 ? 'e não' : 'sem') : 'nem'}
           </span>
           <span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 font-mono text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300">
             −{filter.text}

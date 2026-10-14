@@ -4,12 +4,30 @@ export interface FilterOptions {
   searchTerm: string;
   searchMode?: SearchMode;
   searchFilters?: SearchFilter[];
-  /** How included terms combine (default 'or'). Exclusions always hide a record when any of them matches. */
+  /** Connector used by included terms that have none of their own (default 'or'). */
   includeOperator?: FilterOperator;
   level: LogLevel;
   lineLimit?: string;
   customLineLimit?: number;
   lineLimitDirection?: 'tail' | 'head';
+}
+
+/**
+ * Groups included terms into blocks joined by OR; terms inside a block are joined by AND.
+ * A term whose connector is OR starts a new block, so "a E b OU c E d" becomes [[a, b], [c, d]].
+ */
+export function getIncludeBlocks(
+  filters: SearchFilter[],
+  defaultOperator: FilterOperator = 'or'
+): SearchFilter[][] {
+  const blocks: SearchFilter[][] = [];
+  for (const filter of filters) {
+    if (filter.mode !== 'include') continue;
+    const connector = filter.connector ?? defaultOperator;
+    if (blocks.length === 0 || connector === 'or') blocks.push([filter]);
+    else blocks[blocks.length - 1].push(filter);
+  }
+  return blocks;
 }
 
 /**
@@ -40,7 +58,7 @@ export function filterLogEntries(
       { id: 'legacy-search', text: searchTerm.trim().toLowerCase(), mode: searchMode },
     ];
   }
-  const includeTerms = normalizedFilters.filter((filter) => filter.mode === 'include');
+  const includeBlocks = getIncludeBlocks(normalizedFilters, includeOperator);
   const excludeTerms = normalizedFilters.filter((filter) => filter.mode === 'exclude');
 
   const filtered = entries.filter((entry) => {
@@ -62,12 +80,11 @@ export function filterLogEntries(
       ...entry.stackTrace,
     ].join('\n').toLowerCase();
 
-    // Inclusions combine with the chosen operator: OR needs at least one term, AND needs every term.
+    // A record matches when every term of at least one block is present (AND inside, OR between blocks).
     // Exclusions hide a record when any of them is present.
     const containsTerm = (filter: SearchFilter) => searchableText.includes(filter.text);
     const matchesInclusions =
-      includeTerms.length === 0 ||
-      (includeOperator === 'and' ? includeTerms.every(containsTerm) : includeTerms.some(containsTerm));
+      includeBlocks.length === 0 || includeBlocks.some((block) => block.every(containsTerm));
     const matchesAnyExclusion = excludeTerms.some(containsTerm);
 
     return matchesInclusions && !matchesAnyExclusion;
