@@ -15,7 +15,7 @@
     "desktop": "electron .",
     "build:exe": "vite build && electron-builder --win portable",
     "build:installer": "vite build && electron-builder --win nsis",
-    "release": "vite build && electron-builder --win nsis --publish always && electron-builder --win portable --publish always"
+    "release": "vite build && node scripts/ensure-release.mjs && electron-builder --win nsis --publish always && electron-builder --win portable --publish always"
   },
   "build": {
     "appId": "com.octosearch.desktop",
