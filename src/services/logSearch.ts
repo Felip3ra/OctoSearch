@@ -1,9 +1,11 @@
-import { LogEntry, LogLevel, SearchFilter, SearchMode } from '../types';
+import { FilterOperator, LogEntry, LogLevel, SearchFilter, SearchMode } from '../types';
 
 export interface FilterOptions {
   searchTerm: string;
   searchMode?: SearchMode;
   searchFilters?: SearchFilter[];
+  /** How included terms combine (default 'or'). Exclusions always hide a record when any of them matches. */
+  includeOperator?: FilterOperator;
   level: LogLevel;
   lineLimit?: string;
   customLineLimit?: number;
@@ -22,6 +24,7 @@ export function filterLogEntries(
     searchTerm,
     searchMode = 'include',
     searchFilters = [],
+    includeOperator = 'or',
     level,
     lineLimit = 'ALL',
     customLineLimit = 100,
@@ -59,16 +62,15 @@ export function filterLogEntries(
       ...entry.stackTrace,
     ].join('\n').toLowerCase();
 
-    // Inclusions are alternatives (OR): a record needs at least one of them.
+    // Inclusions combine with the chosen operator: OR needs at least one term, AND needs every term.
     // Exclusions hide a record when any of them is present.
-    const matchesAnyInclusion =
+    const containsTerm = (filter: SearchFilter) => searchableText.includes(filter.text);
+    const matchesInclusions =
       includeTerms.length === 0 ||
-      includeTerms.some((filter) => searchableText.includes(filter.text));
-    const matchesAnyExclusion = excludeTerms.some((filter) =>
-      searchableText.includes(filter.text)
-    );
+      (includeOperator === 'and' ? includeTerms.every(containsTerm) : includeTerms.some(containsTerm));
+    const matchesAnyExclusion = excludeTerms.some(containsTerm);
 
-    return matchesAnyInclusion && !matchesAnyExclusion;
+    return matchesInclusions && !matchesAnyExclusion;
   });
 
   // 3. Line count limit filter

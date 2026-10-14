@@ -6,6 +6,7 @@ import {
   FolderTab,
   SavedFolder,
   HighlightRule,
+  SavedFilter,
   SearchFilter,
   SearchMode,
   FileSortField,
@@ -38,6 +39,8 @@ import { DesktopModal } from './components/DesktopModal';
 import { SavedFoldersModal } from './components/SavedFoldersModal';
 import { HighlightRulesModal } from './components/HighlightRulesModal';
 import { SettingsModal } from './components/SettingsModal';
+import { SavedFiltersModal } from './components/SavedFiltersModal';
+import { cloneFilterTerms, getSavedFilters, persistSavedFilters } from './services/filterStorage';
 import {
   Search,
   X,
@@ -52,6 +55,7 @@ import {
   Plus,
   Settings,
   WrapText,
+  Bookmark,
   Layers,
   FileText,
   FolderOpen,
@@ -82,6 +86,7 @@ function createFolderTab(
     searchTerm: '',
     searchMode: 'include',
     searchFilters: [],
+    includeOperator: 'or',
     levelFilter: 'ALL',
     lineLimit: 'ALL',
     customLineLimit: 100,
@@ -259,6 +264,13 @@ export default function App() {
   const isSessionRestored = useRef(false);
   const [isSavedFoldersModalOpen, setIsSavedFoldersModalOpen] = useState<boolean>(false);
   const [isHighlightRulesModalOpen, setIsHighlightRulesModalOpen] = useState(false);
+  const [isSavedFiltersModalOpen, setIsSavedFiltersModalOpen] = useState(false);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => getSavedFilters());
+
+  const handleSavedFiltersChange = (next: SavedFilter[]) => {
+    setSavedFilters(next);
+    persistSavedFilters(next);
+  };
   const [highlightRules, setHighlightRules] = useState<HighlightRule[]>(loadHighlightRules);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [wordWrap, setWordWrap] = useState(() => {
@@ -653,6 +665,7 @@ export default function App() {
   const searchTerm = activeTab?.searchTerm || '';
   const searchMode = activeTab?.searchMode || 'include';
   const searchFilters = activeTab?.searchFilters || [];
+  const includeOperator = activeTab?.includeOperator || 'or';
   const includedSearchTerms = useMemo(
     () => searchFilters.filter((filter) => filter.mode === 'include').map((filter) => filter.text),
     [searchFilters]
@@ -692,6 +705,28 @@ export default function App() {
       searchFilters: (tab.searchFilters || []).filter((filter) => filter.id !== filterId),
     }));
 
+  const toggleSearchFilterMode = (filterId: string) =>
+    updateActiveTab((tab) => ({
+      ...tab,
+      searchFilters: (tab.searchFilters || []).map((filter) =>
+        filter.id === filterId ? { ...filter, mode: filter.mode === 'include' ? 'exclude' : 'include' } : filter
+      ),
+    }));
+
+  const toggleIncludeOperator = () =>
+    updateActiveTab((tab) => ({ ...tab, includeOperator: (tab.includeOperator || 'or') === 'or' ? 'and' : 'or' }));
+
+  const applySavedFilter = (saved: SavedFilter) => {
+    updateActiveTab((tab) => ({
+      ...tab,
+      searchTerm: '',
+      searchFilters: cloneFilterTerms(saved),
+      includeOperator: saved.includeOperator,
+      levelFilter: saved.levelFilter,
+    }));
+    setIsSavedFiltersModalOpen(false);
+  };
+
   const clearSearchFilters = () => updateActiveTab((tab) => ({ ...tab, searchTerm: '', searchFilters: [] }));
   const setLevelFilter = (level: LogLevel) => updateActiveTab((tab) => ({ ...tab, levelFilter: level }));
   const setLineLimit = (limit: string) => updateActiveTab((tab) => ({ ...tab, lineLimit: limit }));
@@ -705,12 +740,13 @@ export default function App() {
       searchTerm: '',
       searchMode,
       searchFilters,
+      includeOperator,
       level: levelFilter,
       lineLimit,
       customLineLimit,
       lineLimitDirection,
     });
-  }, [entries, searchMode, searchFilters, levelFilter, lineLimit, customLineLimit, lineLimitDirection]);
+  }, [entries, searchMode, searchFilters, includeOperator, levelFilter, lineLimit, customLineLimit, lineLimitDirection]);
 
   const levelCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: entries.length, INF: 0, WRN: 0, ERR: 0, DBG: 0, OTHER: 0 };
@@ -726,6 +762,7 @@ export default function App() {
       searchTerm: '',
       searchMode: 'include',
       searchFilters: [],
+      includeOperator: 'or',
       levelFilter: 'ALL',
       lineLimit: 'ALL',
     }));
@@ -750,6 +787,7 @@ export default function App() {
       }
       if (event.key === 'Escape') {
         if (isSettingsOpen) setIsSettingsOpen(false);
+        else if (isSavedFiltersModalOpen) return; // the modal closes itself on Escape
         else if (searchTerm) setSearchTerm('');
       }
     };
@@ -944,7 +982,7 @@ export default function App() {
                     type="button"
                     onClick={() => addSearchFilter('include')}
                     disabled={!searchTerm.trim()}
-                    title="Mostrar registros que contêm este texto. Vários termos incluídos funcionam como OU (Enter)"
+                    title="Mostrar registros que contêm este texto. Vários termos incluídos combinam com OU ou E (clique no conector entre eles para alternar) (Enter)"
                     className="flex items-center gap-1 px-2.5 text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
                   >
                     <Plus className="h-3.5 w-3.5" /> Incluir
@@ -1040,6 +1078,20 @@ export default function App() {
               </div>
 
               <div className="ml-auto flex min-w-max items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setIsSavedFiltersModalOpen(true)}
+                  disabled={!activeTab}
+                  title="Salvar os filtros atuais ou aplicar um filtro salvo"
+                  className={`${toolbarButtonClass} ${neutralButtonClass}`}
+                >
+                  <Bookmark className="h-3.5 w-3.5" />
+                  <span className="hidden lg:inline">Filtros salvos</span>
+                  {savedFilters.length > 0 && (
+                    <span className="rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-200">{savedFilters.length}</span>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsHighlightRulesModalOpen(true)}
@@ -1146,28 +1198,60 @@ export default function App() {
                 ...searchFilters.filter((filter) => filter.mode === 'exclude'),
               ].map((filter, index, ordered) => (
                 <React.Fragment key={filter.id}>
-                {index > 0 && (
+                {index > 0 && filter.mode === 'include' && (
+                  <button
+                    type="button"
+                    onClick={toggleIncludeOperator}
+                    title={
+                      includeOperator === 'and'
+                        ? 'E: o registro precisa conter todos os termos incluídos. Clique para trocar para OU'
+                        : 'OU: basta o registro conter um dos termos incluídos. Clique para trocar para E'
+                    }
+                    className={`shrink-0 cursor-pointer rounded border px-1.5 py-px text-[10px] font-bold uppercase tracking-wide transition-colors ${
+                      includeOperator === 'and'
+                        ? 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300'
+                        : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {includeOperator === 'and' ? 'e' : 'ou'}
+                  </button>
+                )}
+                {index > 0 && filter.mode === 'exclude' && (
                   <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    {filter.mode === 'include' ? 'ou' : ordered[index - 1].mode === 'include' ? 'e não' : 'nem'}
+                    {ordered[index - 1].mode === 'include' ? 'e não' : 'nem'}
                   </span>
                 )}
                 {index === 0 && filter.mode === 'exclude' && (
                   <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">sem</span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => removeSearchFilter(filter.id)}
-                  className={`group flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 font-medium transition-colors ${
+                <span
+                  className={`flex shrink-0 items-center overflow-hidden rounded-full border font-medium ${
                     filter.mode === 'exclude'
-                      ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300'
+                      ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300'
                   }`}
-                  title="Remover filtro"
                 >
-                  {filter.mode === 'exclude' ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                  <span className="font-mono">{filter.text}</span>
-                  <X className="h-3 w-3 opacity-50 group-hover:opacity-100" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleSearchFilterMode(filter.id)}
+                    title={filter.mode === 'exclude' ? 'Clique para incluir este termo em vez de excluir' : 'Clique para excluir este termo em vez de incluir'}
+                    className={`flex cursor-pointer items-center gap-1 py-0.5 pl-2.5 pr-1 transition-colors ${
+                      filter.mode === 'exclude' ? 'hover:bg-rose-100 dark:hover:bg-rose-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                    }`}
+                  >
+                    {filter.mode === 'exclude' ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                    <span className="font-mono">{filter.text}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSearchFilter(filter.id)}
+                    title="Remover filtro"
+                    aria-label={`Remover filtro ${filter.text}`}
+                    className="cursor-pointer py-0.5 pl-0.5 pr-2 opacity-50 transition-opacity hover:opacity-100"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
                 </React.Fragment>
               ))}
               {levelFilter !== 'ALL' && (
@@ -1294,6 +1378,17 @@ export default function App() {
         onToggleFavorite={handleToggleFavoriteFolder}
         onRemoveFolder={handleRemoveSavedFolder}
         onAddManualFolder={handleAddManualFolder}
+      />
+
+      <SavedFiltersModal
+        isOpen={isSavedFiltersModalOpen}
+        savedFilters={savedFilters}
+        currentFilters={searchFilters}
+        currentOperator={includeOperator}
+        currentLevel={levelFilter}
+        onChange={handleSavedFiltersChange}
+        onApply={applySavedFilter}
+        onClose={() => setIsSavedFiltersModalOpen(false)}
       />
 
       <HighlightRulesModal

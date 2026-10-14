@@ -1,6 +1,8 @@
 export type LogLevel = 'ALL' | 'INF' | 'WRN' | 'ERR' | 'DBG' | 'OTHER';
 export type EntryLogLevel = 'INF' | 'WRN' | 'ERR' | 'DBG' | 'OTHER';
 export type SearchMode = 'include' | 'exclude';
+/** How included terms combine: 'or' needs any of them, 'and' needs all of them. */
+export type FilterOperator = 'or' | 'and';
 
 export interface SearchFilter {
   id: string;
@@ -49,6 +51,7 @@ export interface FolderTab {
   searchTerm: string;
   searchMode: SearchMode;
   searchFilters: SearchFilter[];
+  includeOperator?: FilterOperator;
   levelFilter: LogLevel;
   lineLimit?: string;
   customLineLimit?: number;
@@ -69,6 +72,18 @@ export interface SavedFolder {
   lastAccessed: number;
   fileCount: number;
   isFavorite: boolean;
+}
+
+/** A named set of search filters the user can re-apply; `group` is '' when ungrouped. */
+export interface SavedFilter {
+  id: string;
+  name: string;
+  group: string;
+  filters: SearchFilter[];
+  includeOperator: FilterOperator;
+  levelFilter: LogLevel;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface HighlightRule {
