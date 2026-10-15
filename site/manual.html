@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manual do OctoSearch</title>
+  <meta name="description" content="Manual completo do OctoSearch: instalação, abertura de pastas, busca com E/OU, filtros salvos, marcadores, tempo real, atalhos e formatos de log suportados." />
+  <meta property="og:title" content="Manual do OctoSearch" />
+  <meta property="og:description" content="Guia completo, com prints, de todas as funções do OctoSearch." />
+  <meta property="og:image" content="https://octosearch-omega.vercel.app/og-image.png" />
+  <meta name="theme-color" content="#0b1530" />
+  <link rel="icon" type="image/png" href="logo-32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070d1f;
+      --bg-2: #0b1530;
+      --card: #0f1c3d;
+      --line: #1d2f5c;
+      --text: #e6eeff;
+      --muted: #93a4c8;
+      --accent: #22b8f0;
+      --accent-2: #1e6fe0;
+      --mark: #f59e0b;
+      --inc: #34d399;
+      --exc: #fb7185;
+      --and: #a78bfa;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+    body {
+      margin: 0;
+      background: radial-gradient(1000px 500px at 80% -10%, #12306b44, transparent 60%), var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.7;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    nav.top { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: #070d1fd9; border-bottom: 1px solid #ffffff0d; }
+    nav.top .in { max-width: 1240px; margin: 0 auto; padding: 0 20px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; font-size: 18px; color: var(--text); }
+    .brand:hover { text-decoration: none; }
+    .brand img { width: 34px; height: 34px; }
+    .brand small { font-weight: 500; color: var(--muted); font-size: 14px; }
+    .top-links { display: flex; gap: 22px; align-items: center; font-size: 14px; }
+    .top-links a { color: var(--muted); }
+    .top-links a:hover { color: var(--text); text-decoration: none; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff !important; }
+    .btn:hover { text-decoration: none; filter: brightness(1.08); }
+    .menu-toggle { display: none; background: #ffffff0d; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 8px 12px; font: 600 14px Inter, sans-serif; cursor: pointer; }
+
+    .layout { max-width: 1240px; margin: 0 auto; padding: 0 20px; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; }
+    aside.toc { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; padding: 32px 0 40px; font-size: 14px; }
+    .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 12px; }
+    .toc ol { list-style: none; padding: 0; margin: 0; counter-reset: t; }
+    .toc li { counter-increment: t; }
+    .toc a { display: flex; gap: 10px; padding: 6px 10px; border-radius: 8px; color: var(--muted); line-height: 1.4; }
+    .toc a::before { content: counter(t); min-width: 18px; color: #4f6290; font-variant-numeric: tabular-nums; }
+    .toc a:hover { background: #ffffff08; color: var(--text); text-decoration: none; }
+    .toc a.active { background: #22b8f014; color: var(--text); }
+    .toc a.active::before { color: var(--accent); }
+
+    main { padding: 32px 0 80px; min-width: 0; }
+    .hero { padding: 24px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+    .eyebrow { color: var(--accent); font-weight: 600; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { font-size: clamp(32px, 5vw, 48px); letter-spacing: -.035em; line-height: 1.1; margin: 10px 0 12px; }
+    .hero p { color: var(--muted); font-size: 18px; max-width: 720px; margin: 0 0 20px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+    .chip { font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); background: #ffffff06; }
+
+    section { padding: 40px 0 8px; border-bottom: 1px solid #ffffff0a; }
+    section:last-of-type { border-bottom: 0; }
+    h2.s { font-size: 28px; letter-spacing: -.02em; margin: 0 0 6px; display: flex; align-items: baseline; gap: 12px; }
+    h2.s .n { font-size: 15px; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+    h3 { font-size: 19px; margin: 32px 0 8px; letter-spacing: -.01em; }
+    p, li { color: #cfdaf3; }
+    p.lead { color: var(--muted); margin-top: 0; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 4px 0; }
+    strong { color: var(--text); }
+    code, kbd {
+      font-family: "JetBrains Mono", Consolas, monospace; font-size: .86em;
+      background: #ffffff0f; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--text);
+    }
+    kbd { border-bottom-width: 2px; white-space: nowrap; }
+    .t-inc { color: var(--inc); font-weight: 600; }
+    .t-exc { color: var(--exc); font-weight: 600; }
+    .t-and { color: var(--and); font-weight: 700; }
+
+    figure { margin: 20px 0 24px; }
+    figure a { display: block; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); background: #020617; box-shadow: 0 24px 48px -28px #000c; }
+    figure a:hover { border-color: #22b8f066; }
+    figure img { display: block; width: 100%; height: auto; }
+    figure.narrow { max-width: 560px; }
+    figure.mid { max-width: 720px; }
+    figcaption { font-size: 13.5px; color: var(--muted); margin-top: 8px; }
+
+    .callouts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; padding: 0; list-style: none; margin: 8px 0 0; }
+    .callouts li { display: flex; gap: 12px; align-items: flex-start; margin: 0; }
+    .callouts b.num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--mark); color: #111827; font-size: 13px; display: grid; place-items: center; margin-top: 2px; }
+
+    .note { border: 1px solid var(--line); border-left: 4px solid var(--accent); background: #0f1c3d99; border-radius: 10px; padding: 14px 18px; margin: 18px 0; }
+    .note.warn { border-left-color: var(--mark); }
+    .note p { margin: 0; }
+    .note p + p { margin-top: 6px; }
+
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 14.5px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; margin: 14px 0 20px; }
+    .table-wrap table { margin: 0; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; color: #cfdaf3; }
+    th { background: #0f1c3d; color: var(--text); font-weight: 600; font-size: 13px; }
+    tr:last-child td { border-bottom: 0; }
+
+    .steps { counter-reset: s; list-style: none; padding: 0; }
+    .steps > li { counter-increment: s; position: relative; padding-left: 40px; margin: 12px 0; }
+    .steps > li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 26px; height: 26px; border-radius: 50%; background: #22b8f022; color: var(--accent); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+
+    footer { border-top: 1px solid #ffffff0d; padding: 28px 20px; color: var(--muted); font-size: 14px; text-align: center; }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; gap: 0; }
+      aside.toc { display: none; position: fixed; inset: 64px 0 auto 0; max-height: calc(100vh - 64px); background: var(--bg-2); border-bottom: 1px solid var(--line); padding: 16px 20px; z-index: 15; }
+      aside.toc.open { display: block; }
+      .menu-toggle { display: inline-block; }
+      .top-links a.hide-sm { display: none; }
+      .callouts { grid-template-columns: 1fr; }
+      .brand small { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="top">
+    <div class="in">
+      <a class="brand" href="index.html"><img src="logo-64.png" alt="" />OctoSearch <small>· Manual</small></a>
+      <div class="top-links">
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="toc">Índice</button>
+        <a class="hide-sm" href="index.html">Início</a>
+        <a class="btn" href="index.html#download">Baixar</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="layout">
+    <aside class="toc" id="toc">
+      <h2>Neste manual</h2>
+      <ol>
+        <li><a href="#introducao">Introdução</a></li>
+        <li><a href="#instalacao">Instalação e atualização</a></li>
+        <li><a href="#visao-geral">Visão geral da tela</a></li>
+        <li><a href="#abrir">Abrindo logs</a></li>
+        <li><a href="#pastas-salvas">Pastas salvas e favoritas</a></li>
+        <li><a href="#abas">Abas</a></li>
+        <li><a href="#arquivos">Lista de arquivos</a></li>
+        <li><a href="#mesclada">Vários arquivos juntos</a></li>
+        <li><a href="#registros">Lendo os registros</a></li>
+        <li><a href="#busca">Busca: incluir e excluir</a></li>
+        <li><a href="#e-ou">Combinando com E e OU</a></li>
+        <li><a href="#nivel-limite">Nível e limite de registros</a></li>
+        <li><a href="#filtros-salvos">Filtros salvos</a></li>
+        <li><a href="#marcadores">Marcadores coloridos</a></li>
+        <li><a href="#quebra">Quebra de linha</a></li>
+        <li><a href="#tempo-real">Tempo real, recarregar e copiar</a></li>
+        <li><a href="#status">Barra de status</a></li>
+        <li><a href="#configuracoes">Configurações e tema</a></li>
+        <li><a href="#atalhos">Atalhos de teclado</a></li>
+        <li><a href="#formatos">Formatos de log suportados</a></li>
+        <li><a href="#problemas">Dúvidas e solução de problemas</a></li>
+      </ol>
+    </aside>
+
+    <main>
+      <div class="hero">
+        <div class="eyebrow">Manual do usuário</div>
+        <h1>Manual do OctoSearch</h1>
+        <p>Tudo o que o OctoSearch faz, passo a passo e com telas reais: desde abrir a primeira pasta até combinar buscas com E/OU, salvar filtros e acompanhar logs em tempo real.</p>
+        <div class="meta">
+          <span class="chip">Versão 1.0.1</span>
+          <span class="chip">Windows 10 e 11</span>
+          <span class="chip">Os exemplos usam logs fictícios de uma loja online</span>
+        </div>
+      </div>
+
+      <!-- 1 -->
+      <section id="introducao">
+        <h2 class="s"><span class="n">01</span>Introdução</h2>
+        <p>O <strong>OctoSearch</strong> é um visualizador de arquivos de log para Windows. Ele lê arquivos <code>.log</code> e <code>.txt</code> de qualquer aplicação (APIs, serviços, servidores, jobs), reconhece data, hora e nível de cada registro e permite encontrar o que importa em segundos.</p>
+        <ul>
+          <li><strong>Abra pastas inteiras</strong>, inclusive com subpastas e em caminhos de rede.</li>
+          <li><strong>Veja vários arquivos juntos</strong>, mesclados em ordem cronológica.</li>
+          <li><strong>Busque incluindo e excluindo termos</strong> e combine-os com <span class="t-and">E</span> e <strong>OU</strong>.</li>
+          <li><strong>Salve filtros</strong> com nome e grupo, e <strong>destaque linhas</strong> com marcadores coloridos.</li>
+          <li><strong>Acompanhe em tempo real</strong> os arquivos que estão sendo escritos.</li>
+        </ul>
+        <div class="note">
+          <p><strong>Seus logs não saem do seu computador.</strong> O OctoSearch funciona 100% offline e lê os arquivos diretamente do disco.</p>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section id="instalacao">
+        <h2 class="s"><span class="n">02</span>Instalação e atualização</h2>
+        <p class="lead">Há duas versões, ambas gratuitas, na <a href="index.html#download">página de download</a>.</p>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Versão</th><th>Quando usar</th><th>Atualização automática</th></tr>
+            <tr><td><strong>Instalador</strong> (<code>OctoSearch-Setup.exe</code>)</td><td>Uso diário no seu computador. Cria atalhos no menu Iniciar e na área de trabalho.</td><td>Sim</td></tr>
+            <tr><td><strong>Portátil</strong> (<code>OctoSearch.exe</code>)</td><td>Pen drive, servidores ou máquinas onde você não pode instalar programas.</td><td>Não: baixe de novo pelo site</td></tr>
+          </table>
+        </div>
+        <h3>Instalando</h3>
+        <ol class="steps">
+          <li>Baixe o <strong>instalador</strong> na página de download e execute o arquivo.</li>
+          <li>Se o Windows mostrar <em>“O Windows protegeu o computador”</em>, clique em <strong>Mais informações</strong> e depois em <strong>Executar assim mesmo</strong>. O aviso aparece porque o instalador ainda não tem assinatura digital.</li>
+          <li>Escolha a pasta de instalação (ou mantenha a sugerida) e conclua. O OctoSearch abre ao terminar.</li>
+        </ol>
+        <h3>Atualizações</h3>
+        <p>Na versão instalada, o OctoSearch procura versões novas sempre que é aberto e, se ficar aberto, a cada 6 horas. Quando encontra, baixa em segundo plano e mostra o aviso <strong>“Atualização disponível”</strong>:</p>
+        <ul>
+          <li><strong>Reiniciar agora</strong>: fecha, instala e abre a nova versão.</li>
+          <li><strong>Depois</strong>: a atualização é instalada automaticamente quando você fechar o aplicativo.</li>
+        </ul>
+      </section>
+
+      <!-- 3 -->
+      <section id="visao-geral">
+        <h2 class="s"><span class="n">03</span>Visão geral da tela</h2>
+        <p class="lead">Esta é a tela principal com uma pasta aberta e três arquivos selecionados. Os números indicam cada área, explicadas nas seções seguintes.</p>
+        <figure>
+          <a href="manual/02-visao-geral.webp" target="_blank" rel="noopener"><img src="manual/02-visao-geral.webp" width="2200" height="1315" alt="Tela principal do OctoSearch com as áreas numeradas de 1 a 10" /></a>
+          <figcaption>Clique em qualquer imagem do manual para vê-la em tamanho real.</figcaption>
+        </figure>
+        <ol class="callouts">
+          <li><b class="num">1</b><span><strong>Abas</strong>: cada pasta aberta fica em uma aba. O <code>+</code> abre outra pasta. <a href="#abas">Ver abas</a></span></li>
+          <li><b class="num">2</b><span><strong>Tema e configurações</strong>: alterna claro/escuro e abre as configurações. <a href="#configuracoes">Ver configurações</a></span></li>
+          <li><b class="num">3</b><span><strong>Pasta atual</strong>: caminho da pasta, estrela de favorito, <strong>Pastas salvas</strong> e <strong>Abrir pasta</strong>. <a href="#abrir">Ver abrir logs</a></span></li>
+          <li><b class="num">4</b><span><strong>Lista de arquivos</strong>: os logs encontrados na pasta e nas subpastas. <a href="#arquivos">Ver lista de arquivos</a></span></li>
+          <li><b class="num">5</b><span><strong>Busca e limite</strong>: incluir/excluir termos e limitar a quantidade de registros. <a href="#busca">Ver busca</a></span></li>
+          <li><b class="num">6</b><span><strong>Níveis</strong>: filtra por ERR, WRN, INF, DBG ou Outros, com a contagem de cada um. <a href="#nivel-limite">Ver níveis</a></span></li>
+          <li><b class="num">7</b><span><strong>Ferramentas</strong>: filtros salvos, marcadores, quebra de linha, tempo real, recarregar e copiar. <a href="#tempo-real">Ver ferramentas</a></span></li>
+          <li><b class="num">8</b><span><strong>Visualizador</strong>: os registros do log, com data, nível, mensagem e stack trace. <a href="#registros">Ver registros</a></span></li>
+          <li><b class="num">9</b><span><strong>Prévia do log</strong>: miniatura de todo o conteúdo; clique para pular para aquele ponto.</span></li>
+          <li><b class="num">10</b><span><strong>Barra de status</strong>: arquivos selecionados, tamanho, linhas e registros exibidos. <a href="#status">Ver barra de status</a></span></li>
+        </ol>
+      </section>
+
+      <!-- 4 -->
+      <section id="abrir">
+        <h2 class="s"><span class="n">04</span>Abrindo logs</h2>
+        <p class="lead">Ao abrir o OctoSearch pela primeira vez, a tela fica vazia esperando uma pasta.</p>
+        <figure>
+          <a href="manual/01-tela-inicial.webp" target="_blank" rel="noopener"><img src="manual/01-tela-inicial.webp" width="2200" height="1315" loading="lazy" alt="Tela inicial do OctoSearch sem nenhuma pasta aberta" /></a>
+          <figcaption>Tela inicial: “Abra uma pasta de logs”.</figcaption>
+        </figure>
+        <p>Existem três formas de abrir logs:</p>
+        <ol class="steps">
+          <li><strong>Abrir pasta</strong> (botão azul no canto superior direito): escolha uma pasta no Windows. O OctoSearch procura arquivos de log nela <em>e em todas as subpastas</em>.</li>
+          <li><strong>Pastas salvas</strong>: reabra com um clique uma pasta que você já usou. <a href="#pastas-salvas">Veja a próxima seção</a>.</li>
+          <li><strong>Arrastar e soltar</strong>: arraste arquivos <code>.log</code> ou <code>.txt</code> do Explorer para a janela. Eles abrem em uma nova aba.</li>
+        </ol>
+        <div class="note">
+          <p><strong>Quais arquivos aparecem?</strong> Arquivos <code>.log</code>, <code>.txt</code> e logs rotacionados, como <code>app.log.1</code> ou <code>app.txt.3</code>. Outros tipos de arquivo são ignorados.</p>
+        </div>
+        <p>Cada pasta aberta é guardada no histórico de <strong>Pastas salvas</strong>. Ao fechar e abrir o OctoSearch de novo, as abas que estavam abertas são restauradas, com os mesmos arquivos selecionados.</p>
+      </section>
+
+      <!-- 5 -->
+      <section id="pastas-salvas">
+        <h2 class="s"><span class="n">05</span>Pastas salvas e favoritas</h2>
+        <p class="lead">O botão <strong>Pastas salvas</strong> mostra um atalho com as pastas favoritas (estrela) e as recentes (relógio).</p>
+        <figure class="mid">
+          <a href="manual/04-pastas-atalho.webp" target="_blank" rel="noopener"><img src="manual/04-pastas-atalho.webp" width="1032" height="636" loading="lazy" alt="Menu rápido de pastas favoritas e recentes" /></a>
+          <figcaption>Atalho “Favoritas e recentes”: clique em uma pasta para abri-la.</figcaption>
+        </figure>
+        <p>Clique em <strong>Gerenciar pastas salvas…</strong> para ver a lista completa:</p>
+        <figure class="mid">
+          <a href="manual/05-pastas-salvas.webp" target="_blank" rel="noopener"><img src="manual/05-pastas-salvas.webp" width="1384" height="1282" loading="lazy" alt="Janela de pastas salvas com favoritas e histórico" /></a>
+          <figcaption>Pastas favoritas no topo e histórico de pastas recentes abaixo.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Abrir</strong>: carrega os logs da pasta. A pasta já aberta aparece marcada como <em>Aberta agora</em>.</li>
+          <li><strong>Estrela</strong>: favorita ou desfavorita. As favoritas ficam no topo da lista e do atalho.</li>
+          <li><strong>Lixeira</strong>: remove a pasta do histórico. Os arquivos <em>não</em> são apagados do disco.</li>
+          <li><strong>Buscar</strong>: filtra a lista por nome ou caminho.</li>
+          <li><strong>Adicionar Caminho</strong>: cadastra uma pasta digitando o caminho, como <code>D:\Servicos\Logs</code> ou um caminho de rede <code>\\servidor\logs</code>.</li>
+        </ul>
+        <p>Também dá para favoritar a pasta atual pela <strong>estrela</strong> que fica à direita do caminho, na barra da pasta.</p>
+      </section>
+
+      <!-- 6 -->
+      <section id="abas">
+        <h2 class="s"><span class="n">06</span>Abas</h2>
+        <p class="lead">Cada pasta aberta vira uma aba, com seus próprios arquivos selecionados, buscas e filtros. O número na aba é a quantidade de arquivos de log da pasta.</p>
+        <ul>
+          <li><strong>Trocar de pasta</strong>: clique na aba.</li>
+          <li><strong>Abrir outra pasta</strong>: clique no <code>+</code> ao lado das abas.</li>
+          <li><strong>Fechar</strong>: clique no <code>×</code> da aba.</li>
+          <li><strong>Dar um apelido</strong>: dê um <strong>duplo clique</strong> na aba, digite o nome (ex.: “API Produção”) e pressione <kbd>Enter</kbd>. <kbd>Esc</kbd> cancela.</li>
+        </ul>
+        <p>Clicando com o <strong>botão direito</strong> na aba, você tem mais opções:</p>
+        <figure class="narrow">
+          <a href="manual/03-menu-aba.webp" target="_blank" rel="noopener"><img src="manual/03-menu-aba.webp" width="876" height="516" loading="lazy" alt="Menu de contexto de uma aba" /></a>
+          <figcaption>Menu da aba: ativar, alterar apelido, favoritar, copiar caminho, mostrar no Explorer e fechar.</figcaption>
+        </figure>
+      </section>
+
+      <!-- 7 -->
+      <section id="arquivos">
+        <h2 class="s"><span class="n">07</span>Lista de arquivos</h2>
+        <p class="lead">À esquerda ficam os arquivos de log da pasta, organizados em árvore pelas subpastas. Os arquivos marcados são os exibidos no visualizador.</p>
+        <figure class="narrow">
+          <a href="manual/06-lista-arquivos.webp" target="_blank" rel="noopener"><img src="manual/06-lista-arquivos.webp" width="752" height="1160" loading="lazy" alt="Lista de arquivos em árvore com três selecionados e o menu de contexto de um arquivo" /></a>
+          <figcaption>Três arquivos selecionados e o menu do botão direito sobre um arquivo.</figcaption>
+        </figure>
+        <h3>Selecionando arquivos</h3>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Ação</th><th>Resultado</th></tr>
+            <tr><td>Clique no arquivo</td><td>Mostra <strong>somente</strong> esse arquivo.</td></tr>
+            <tr><td>Clique na caixa de seleção</td><td>Adiciona ou remove o arquivo da seleção.</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + clique</td><td>Adiciona ou remove o arquivo da seleção.</td></tr>
+            <tr><td><kbd>Shift</kbd> + clique</td><td>Seleciona todos os arquivos entre o último clicado e este.</td></tr>
+            <tr><td>Caixa de seleção da pasta</td><td>Marca ou desmarca todos os arquivos daquela subpasta.</td></tr>
+            <tr><td><strong>Selecionar todos</strong> ou <kbd>Ctrl</kbd> + <kbd>A</kbd> na lista</td><td>Seleciona todos os arquivos visíveis.</td></tr>
+          </table>
+        </div>
+        <p>Ao abrir uma pasta, o OctoSearch já seleciona o log mais recente de cada subpasta.</p>
+        <h3>Outras opções</h3>
+        <ul>
+          <li><strong>Filtrar arquivos…</strong>: mostra só os arquivos cujo nome ou caminho contém o texto digitado.</li>
+          <li><strong>Ordenação</strong> (botão “Nome ↑”): abre as configurações para ordenar por nome, data de criação ou última modificação. <a href="#configuracoes">Ver configurações</a>.</li>
+          <li><strong>Botão direito em um arquivo</strong>: <em>Abrir somente este</em>, <em>Adicionar/Remover da seleção</em>, <em>Copiar caminho</em> e <em>Mostrar no Explorer</em>.</li>
+          <li><strong>Botão direito em uma subpasta</strong>: <em>Ver somente esta pasta</em> (seleciona só os arquivos dela), <em>Expandir ou recolher</em>, <em>Copiar caminho</em> e <em>Mostrar no Explorer</em>.</li>
+        </ul>
+      </section>
+
+      <!-- 8 -->
+      <section id="mesclada">
+        <h2 class="s"><span class="n">08</span>Vários arquivos juntos (visão mesclada)</h2>
+        <p class="lead">Quando você seleciona mais de um arquivo, os registros de todos são <strong>mesclados em ordem cronológica</strong>. É ideal para seguir uma requisição que passa por vários serviços.</p>
+        <figure>
+          <a href="manual/07-visao-mesclada.webp" target="_blank" rel="noopener"><img src="manual/07-visao-mesclada.webp" width="2200" height="663" loading="lazy" alt="Registros de três arquivos mesclados por horário, cada um com uma etiqueta de cor" /></a>
+          <figcaption>API, gateway e worker intercalados pelo horário. Cada arquivo tem uma etiqueta com cor própria.</figcaption>
+        </figure>
+        <ul>
+          <li>O título mostra <strong>“3 arquivos consolidados”</strong> e as bolinhas com a cor de cada arquivo.</li>
+          <li>A etiqueta à esquerda de cada registro diz de qual arquivo ele veio.</li>
+          <li>O número da linha é a linha dentro do arquivo de origem.</li>
+          <li>No rodapé da lista de arquivos, <strong>Limpar</strong> desfaz a seleção.</li>
+        </ul>
+        <div class="note warn">
+          <p><strong>Arquivos muito grandes:</strong> o conteúdo de cada arquivo selecionado é carregado na memória. Abrir uma pasta com muitos arquivos é leve; selecionar dezenas de arquivos grandes ao mesmo tempo pode deixar o app mais lento.</p>
+        </div>
+      </section>
+
+      <!-- 9 -->
+      <section id="registros">
+        <h2 class="s"><span class="n">09</span>Lendo os registros</h2>
+        <p class="lead">Cada linha do visualizador é um registro: o número da linha, a etiqueta do arquivo (na visão mesclada), a data e hora, o nível e a mensagem.</p>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Nível</th><th>Significado</th><th>Também reconhece</th></tr>
+            <tr><td><code>ERR</code></td><td>Erros e falhas (linha com fundo vermelho)</td><td>ERROR, FATAL, CRITICAL, EXCEPTION…</td></tr>
+            <tr><td><code>WRN</code></td><td>Avisos (fundo âmbar)</td><td>WARN, WARNING</td></tr>
+            <tr><td><code>INF</code></td><td>Informações</td><td>INFO, INFORMATION, NOTICE</td></tr>
+            <tr><td><code>DBG</code></td><td>Depuração e rastreamento</td><td>DEBUG, TRACE, VERBOSE</td></tr>
+            <tr><td><strong>Outros</strong></td><td>Linhas sem nível reconhecido</td><td>—</td></tr>
+          </table>
+        </div>
+        <h3>Exceções e stack trace</h3>
+        <p>Registros com stack trace mostram uma seta <code>›</code> e o link <code>[+N linhas de exceção]</code>. Clique para expandir o <strong>contexto da exceção</strong>; clique de novo para recolher.</p>
+        <figure>
+          <a href="manual/12-stack-trace.webp" target="_blank" rel="noopener"><img src="manual/12-stack-trace.webp" width="2200" height="915" loading="lazy" alt="Registro de erro com a stack trace expandida e o menu do botão direito aberto" /></a>
+          <figcaption>Exceção expandida e o menu do botão direito sobre o registro.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Botão direito no registro</strong>: <em>Copiar registro completo</em> (com a stack trace), <em>Copiar mensagem</em>, <em>Copiar data e hora</em> e <em>Expandir/Recolher exceção</em>.</li>
+          <li><strong>Ícone de copiar</strong>: ao passar o mouse sobre um registro, aparece um botão que copia o registro completo.</li>
+          <li>Se o termo buscado estiver <em>dentro</em> da stack trace, ela já abre expandida.</li>
+        </ul>
+        <h3>Navegação rápida</h3>
+        <p>No canto inferior direito do visualizador ficam três botões: <strong>expandir/recolher todas as exceções</strong>, <strong>ir para o início</strong> e <strong>ir para o final</strong>. A <strong>prévia do log</strong>, a faixa estreita à direita, mostra o arquivo inteiro em miniatura, com erros e avisos coloridos: clique em qualquer ponto para pular até lá.</p>
+      </section>
+
+      <!-- 10 -->
+      <section id="busca">
+        <h2 class="s"><span class="n">10</span>Busca: incluir e excluir</h2>
+        <p class="lead">Digite um texto na caixa <strong>Buscar nos logs…</strong> (ou pressione <kbd>Ctrl</kbd> + <kbd>F</kbd>) e escolha o que fazer com ele:</p>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Tecla ou botão</th><th>Efeito</th></tr>
+            <tr><td><kbd>Enter</kbd> ou <span class="t-inc">+ Incluir</span></td><td>Mostra somente os registros que <strong>contêm</strong> o texto.</td></tr>
+            <tr><td><kbd>Shift</kbd> + <kbd>Enter</kbd> ou <span class="t-exc">− Excluir</span></td><td><strong>Esconde</strong> os registros que contêm o texto.</td></tr>
+          </table>
+        </div>
+        <p>Cada termo vira uma etiqueta (“chip”) abaixo da barra de ferramentas. No exemplo, aparecem só os registros com <span class="t-inc">timeout</span> e sem <span class="t-exc">ORD-48291</span>, e as ocorrências ficam destacadas em amarelo:</p>
+        <figure>
+          <a href="manual/08-busca.webp" target="_blank" rel="noopener"><img src="manual/08-busca.webp" width="2200" height="757" loading="lazy" alt="Busca com o termo timeout incluído e ORD-48291 excluído" /></a>
+          <figcaption>“timeout” incluído, “ORD-48291” excluído: 32 de 643 registros.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Trocar entre incluir e excluir</strong>: clique no texto do chip.</li>
+          <li><strong>Remover um termo</strong>: clique no <code>×</code> do chip.</li>
+          <li><strong>Remover tudo</strong>: clique em <strong>Limpar filtros</strong>, à direita dos chips.</li>
+          <li><kbd>Esc</kbd> limpa o texto que ainda está na caixa de busca.</li>
+        </ul>
+        <p>A busca <strong>não diferencia maiúsculas de minúsculas</strong> e procura na mensagem, na data, no nível, no nome do arquivo e na stack trace.</p>
+      </section>
+
+      <!-- 11 -->
+      <section id="e-ou">
+        <h2 class="s"><span class="n">11</span>Combinando termos com E e OU</h2>
+        <p class="lead">Entre dois termos incluídos aparece um conector. Clique nele para alternar entre <strong>OU</strong> e <span class="t-and">E</span>:</p>
+        <ul>
+          <li><strong>OU</strong>: basta o registro ter <em>um</em> dos lados. É o padrão.</li>
+          <li><span class="t-and">E</span>: o registro precisa ter <em>os dois</em> termos.</li>
+        </ul>
+        <figure>
+          <a href="manual/09-e-ou.webp" target="_blank" rel="noopener"><img src="manual/09-e-ou.webp" width="1560" height="140" loading="lazy" alt="Termos agrupados em blocos E, ligados por OU" /></a>
+          <figcaption>(payment <span class="t-and">E</span> timeout) <strong>OU</strong> 502 <strong>OU</strong> (worker <span class="t-and">E</span> retrying).</figcaption>
+        </figure>
+        <p>O <span class="t-and">E</span> sempre agrupa antes do <strong>OU</strong>, e os termos ligados por <span class="t-and">E</span> aparecem juntos dentro de uma moldura roxa tracejada. Assim você vê exatamente como a busca é lida:</p>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Você monta</th><th>O OctoSearch entende</th><th>Mostra registros com…</th></tr>
+            <tr><td>payment <span class="t-and">E</span> timeout</td><td>(payment e timeout)</td><td>os dois termos</td></tr>
+            <tr><td>payment <strong>OU</strong> timeout</td><td>payment ou timeout</td><td>qualquer um dos dois</td></tr>
+            <tr><td>payment <span class="t-and">E</span> timeout <strong>OU</strong> 502</td><td>(payment e timeout) ou 502</td><td>os dois primeiros juntos, ou “502”</td></tr>
+            <tr><td>payment <strong>OU</strong> timeout <span class="t-and">E</span> 502</td><td>payment ou (timeout e 502)</td><td>“payment”, ou “timeout” junto com “502”</td></tr>
+          </table>
+        </div>
+        <p>Os termos <span class="t-exc">excluídos</span> continuam valendo para tudo: <em>“e não …”</em> esconde o registro em qualquer um dos casos.</p>
+        <div class="note">
+          <p><strong>Dica:</strong> para buscar “A e (B ou C)”, monte <em>A <span class="t-and">E</span> B <strong>OU</strong> A <span class="t-and">E</span> C</em>, ou seja, (A e B) ou (A e C).</p>
+        </div>
+      </section>
+
+      <!-- 12 -->
+      <section id="nivel-limite">
+        <h2 class="s"><span class="n">12</span>Nível e limite de registros</h2>
+        <h3>Filtrar por nível</h3>
+        <p>Os botões <strong>Todos · ERR · WRN · INF · DBG · Outros</strong> mostram somente os registros daquele nível. O número ao lado é quantos registros de cada nível existem nos arquivos selecionados.</p>
+        <h3>Limitar a quantidade</h3>
+        <p>O seletor <strong>Todos os registros</strong> limita a quantidade exibida a 50, 100, 500, 1.000, 5.000 ou um número <strong>Personalizado…</strong> (até 500.000). Ao escolher um limite, aparecem as opções:</p>
+        <ul>
+          <li><strong>Últimos</strong>: os registros mais recentes (fim do log), como o <code>tail</code>.</li>
+          <li><strong>Primeiros</strong>: os registros do início do log.</li>
+        </ul>
+        <figure>
+          <a href="manual/11-nivel-e-limite.webp" target="_blank" rel="noopener"><img src="manual/11-nivel-e-limite.webp" width="2200" height="606" loading="lazy" alt="Nível ERR selecionado e limite de 100 últimos registros" /></a>
+          <figcaption>Nível ERR e “Últimos 100 registros”: os dois aparecem como chips e podem ser removidos pelo ×.</figcaption>
+        </figure>
+        <p>Um registro conta como um só, mesmo que tenha várias linhas de stack trace. Nível, limite e busca valem juntos e ficam guardados em cada aba.</p>
+      </section>
+
+      <!-- 13 -->
+      <section id="filtros-salvos">
+        <h2 class="s"><span class="n">13</span>Filtros salvos</h2>
+        <p class="lead">Guarde combinações de busca que você usa sempre, como “erros de pagamento” ou “retentativas do worker”, e aplique de novo com um clique.</p>
+        <figure class="mid">
+          <a href="manual/10-filtros-salvos.webp" target="_blank" rel="noopener"><img src="manual/10-filtros-salvos.webp" width="1384" height="1280" loading="lazy" alt="Janela de filtros salvos organizada por grupos" /></a>
+          <figcaption>Filtros organizados nos grupos “Homologação”, “Produção” e “Sem grupo”.</figcaption>
+        </figure>
+        <h3>Salvar os filtros atuais</h3>
+        <ol class="steps">
+          <li>Monte a busca: termos, conectores <span class="t-and">E</span>/<strong>OU</strong> e, se quiser, um nível.</li>
+          <li>Clique em <strong>Filtros salvos</strong> na barra de ferramentas.</li>
+          <li>Em <strong>Filtros atuais</strong> aparece o resumo do que será salvo. Dê um <strong>Nome</strong> e, se quiser, um <strong>Grupo</strong>: o campo sugere os grupos que já existem.</li>
+          <li>Clique em <strong>Salvar</strong>. Se já existir um filtro com o mesmo nome no mesmo grupo, o botão vira <strong>Substituir</strong> e o filtro antigo é atualizado.</li>
+        </ol>
+        <h3>Usar e organizar</h3>
+        <ul>
+          <li><strong>Aplicar</strong>: substitui os filtros da aba atual pelos do filtro salvo.</li>
+          <li><strong>Lápis</strong> no filtro: renomeia ou move para outro grupo.</li>
+          <li><strong>Lápis</strong> no grupo: renomeia o grupo inteiro. <strong>Lixeira</strong> no grupo: exclui o grupo e todos os filtros dele.</li>
+          <li>Clique no nome do grupo para <strong>recolher ou expandir</strong>.</li>
+          <li><strong>Procurar</strong> encontra filtros por nome, grupo ou termo.</li>
+        </ul>
+        <p>Os filtros salvos ficam guardados no seu computador e continuam lá depois de fechar o aplicativo. O número ao lado de <strong>Filtros salvos</strong> mostra quantos você tem.</p>
+      </section>
+
+      <!-- 14 -->
+      <section id="marcadores">
+        <h2 class="s"><span class="n">14</span>Marcadores coloridos</h2>
+        <p class="lead">Marcadores destacam com uma cor as linhas que contêm um texto, <em>sem esconder</em> as demais. São úteis para enxergar padrões no meio de muito log.</p>
+        <figure class="mid">
+          <a href="manual/13-marcadores.webp" target="_blank" rel="noopener"><img src="manual/13-marcadores.webp" width="1384" height="754" loading="lazy" alt="Janela de marcadores de linha com três regras" /></a>
+          <figcaption>Três marcadores: “timeout” em laranja, “Circuit breaker” em roxo e “retrying” em azul.</figcaption>
+        </figure>
+        <ol class="steps">
+          <li>Clique em <strong>Marcadores</strong> na barra de ferramentas.</li>
+          <li>Digite o <strong>texto contido na linha</strong>, escolha a <strong>cor</strong> e, se precisar, marque <strong>Diferenciar maiúsculas</strong>.</li>
+          <li>Clique em <strong>Adicionar</strong>.</li>
+        </ol>
+        <figure>
+          <a href="manual/14-marcadores-aplicados.webp" target="_blank" rel="noopener"><img src="manual/14-marcadores-aplicados.webp" width="2200" height="867" loading="lazy" alt="Registros destacados nas cores de cada marcador" /></a>
+          <figcaption>As linhas marcadas ganham fundo e borda na cor da regra.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Caixa verde</strong>: ativa ou desativa a regra sem apagá-la.</li>
+          <li><strong>Quadrado de cor</strong>: troca a cor.</li>
+          <li><strong>Setas</strong>: mudam a prioridade. Se uma linha combinar com mais de uma regra, vale a <em>primeira</em> da lista.</li>
+          <li>Os marcadores ativos aparecem como chips ao lado dos filtros, e o botão <strong>Marcadores</strong> mostra quantos estão ativos.</li>
+        </ul>
+      </section>
+
+      <!-- 15 -->
+      <section id="quebra">
+        <h2 class="s"><span class="n">15</span>Quebra de linha</h2>
+        <p class="lead">Mensagens longas ficam cortadas na largura da tela. O botão <strong>Quebrar linhas</strong> (ou <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>W</kbd>) mostra o texto completo em várias linhas.</p>
+        <figure>
+          <a href="manual/15a-sem-quebra.webp" target="_blank" rel="noopener"><img src="manual/15a-sem-quebra.webp" width="2200" height="434" loading="lazy" alt="Mensagens longas cortadas na borda" /></a>
+          <figcaption>Sem quebra: as mensagens são cortadas na borda (é possível rolar para o lado).</figcaption>
+        </figure>
+        <figure>
+          <a href="manual/15b-com-quebra.webp" target="_blank" rel="noopener"><img src="manual/15b-com-quebra.webp" width="2200" height="552" loading="lazy" alt="Mensagens longas quebradas em duas linhas" /></a>
+          <figcaption>Com quebra: a mensagem inteira fica visível.</figcaption>
+        </figure>
+      </section>
+
+      <!-- 16 -->
+      <section id="tempo-real">
+        <h2 class="s"><span class="n">16</span>Tempo real, recarregar e copiar</h2>
+        <figure>
+          <a href="manual/16-ferramentas.webp" target="_blank" rel="noopener"><img src="manual/16-ferramentas.webp" width="1442" height="104" loading="lazy" alt="Barra de ferramentas" /></a>
+          <figcaption>Ferramentas: Filtros salvos, Marcadores, Quebrar linhas, Tempo real, Auto-rolar, Recarregar e Copiar.</figcaption>
+        </figure>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Botão</th><th>O que faz</th></tr>
+            <tr><td><strong>Tempo real</strong></td><td>Com a bolinha verde piscando, o OctoSearch confere os arquivos selecionados a cada 1,5 segundo e recarrega sozinho quando eles mudam no disco. Ideal para acompanhar um serviço rodando.</td></tr>
+            <tr><td><strong>Auto-rolar</strong></td><td>Aparece com o tempo real ligado. Ativo, a tela acompanha a última linha conforme o log cresce; pausado, mantém sua posição para você ler com calma.</td></tr>
+            <tr><td><strong>Recarregar</strong> (setas circulares)</td><td>Lê os arquivos selecionados de novo, na hora.</td></tr>
+            <tr><td><strong>Copiar</strong></td><td>Copia para a área de transferência todos os registros que estão visíveis, já com busca e filtros aplicados. Ótimo para colar num chamado ou num e-mail.</td></tr>
+          </table>
+        </div>
+      </section>
+
+      <!-- 17 -->
+      <section id="status">
+        <h2 class="s"><span class="n">17</span>Barra de status</h2>
+        <figure>
+          <a href="manual/17-barra-de-status.webp" target="_blank" rel="noopener"><img src="manual/17-barra-de-status.webp" width="2200" height="57" loading="lazy" alt="Barra de status" /></a>
+        </figure>
+        <ul>
+          <li><strong>Arquivos selecionados</strong> e o tamanho total deles.</li>
+          <li><strong>Linhas</strong>: total de linhas lidas nos arquivos.</li>
+          <li><strong>Registros</strong>: total de registros reconhecidos (um registro pode ter várias linhas).</li>
+          <li><strong>Exibidos</strong>: quantos registros passam pelos filtros atuais (fica em destaque quando há filtro).</li>
+          <li>À direita: estado do <strong>Tempo real</strong>, do <strong>Auto-rolar</strong> e <strong>Pronto</strong> ou a mensagem de erro, se algo falhar.</li>
+        </ul>
+      </section>
+
+      <!-- 18 -->
+      <section id="configuracoes">
+        <h2 class="s"><span class="n">18</span>Configurações e tema</h2>
+        <p class="lead">Abra pela engrenagem no canto superior direito ou com <kbd>Ctrl</kbd> + <kbd>,</kbd>.</p>
+        <figure class="narrow">
+          <a href="manual/18-configuracoes.webp" target="_blank" rel="noopener"><img src="manual/18-configuracoes.webp" width="1064" height="1432" loading="lazy" alt="Janela de configurações" /></a>
+          <figcaption>Aparência, ordenação dos arquivos e a lista de atalhos.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Tema</strong> e <strong>Quebra de linha</strong>: mostram o estado atual.</li>
+          <li><strong>Ordenar por</strong>: nome, data de criação ou última modificação dos arquivos.</li>
+          <li><strong>Direção</strong>: crescente (mais antigos primeiro) ou decrescente (mais recentes primeiro).</li>
+        </ul>
+        <h3>Modo claro e escuro</h3>
+        <p>O ícone de <strong>sol/lua</strong> ao lado da engrenagem alterna entre o tema escuro e o claro. A escolha fica salva.</p>
+        <figure>
+          <a href="manual/20-modo-claro.webp" target="_blank" rel="noopener"><img src="manual/20-modo-claro.webp" width="2200" height="1315" loading="lazy" alt="OctoSearch no modo claro" /></a>
+          <figcaption>O OctoSearch no modo claro, filtrando erros com os marcadores ativos.</figcaption>
+        </figure>
+      </section>
+
+      <!-- 19 -->
+      <section id="atalhos">
+        <h2 class="s"><span class="n">19</span>Atalhos de teclado</h2>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Atalho</th><th>Ação</th></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>F</kbd></td><td>Ir para a caixa de busca</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>Incluir o termo digitado</td></tr>
+            <tr><td><kbd>Shift</kbd> + <kbd>Enter</kbd></td><td>Excluir o termo digitado</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Limpar o texto da busca ou fechar uma janela</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + clique</td><td>Adicionar ou remover arquivo da seleção</td></tr>
+            <tr><td><kbd>Shift</kbd> + clique</td><td>Selecionar um intervalo de arquivos</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>A</kbd> (na lista de arquivos)</td><td>Selecionar todos os arquivos</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>W</kbd></td><td>Ligar ou desligar a quebra de linha</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>,</kbd></td><td>Abrir as configurações</td></tr>
+            <tr><td><kbd>F5</kbd> ou <kbd>Ctrl</kbd> + <kbd>R</kbd></td><td>Recarregar a janela (as abas abertas são restauradas)</td></tr>
+            <tr><td>Duplo clique na aba</td><td>Alterar o apelido da pasta</td></tr>
+            <tr><td>Botão direito</td><td>Menus de aba, arquivo, subpasta e registro</td></tr>
+          </table>
+        </div>
+      </section>
+
+      <!-- 20 -->
+      <section id="formatos">
+        <h2 class="s"><span class="n">20</span>Formatos de log suportados</h2>
+        <p class="lead">O OctoSearch reconhece automaticamente data, hora e nível nos formatos mais comuns. Linhas recuadas logo depois de um registro (stack traces, tracebacks) são agrupadas com ele.</p>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Formato</th><th>Exemplo</th></tr>
+            <tr><td>Nível entre colchetes</td><td><code>2026-10-08 14:05:58.798 [ERROR] POST /api/orders failed</code></td></tr>
+            <tr><td>Serilog</td><td><code>2026-10-08 10:00:00.123 -03:00 [ERR] mensagem</code></td></tr>
+            <tr><td>log4net / Python logging</td><td><code>2026-10-08 14:05:59,371 WARNING worker - mensagem</code></td></tr>
+            <tr><td>NLog (separado por <code>|</code>)</td><td><code>2026-10-08 10:00:00.1234|ERROR|Logger|mensagem</code></td></tr>
+            <tr><td>Console do .NET (Microsoft.Extensions.Logging)</td><td><code>fail: Categoria[0]</code> com a mensagem na linha seguinte</td></tr>
+            <tr><td>JSON por linha</td><td><code>{"timestamp":"…","level":"error","message":"…"}</code></td></tr>
+            <tr><td>Outras datas</td><td><code>08/10/2026 14:05:58</code>, <code>2026/10/08 …</code>, só a hora <code>14:05:58</code></td></tr>
+          </table>
+        </div>
+        <h3>Formato não reconhecido</h3>
+        <p>Se nenhuma linha de um arquivo seguir um formato conhecido, o OctoSearch avisa e mostra o arquivo <strong>linha a linha</strong>, sem data e nível. A busca, os marcadores e a cópia continuam funcionando normalmente.</p>
+        <figure>
+          <a href="manual/19-formato-nao-reconhecido.webp" target="_blank" rel="noopener"><img src="manual/19-formato-nao-reconhecido.webp" width="2200" height="833" loading="lazy" alt="Aviso de formato de log não reconhecido com as linhas exibidas uma a uma" /></a>
+          <figcaption>Um relatório em texto livre: as 5 linhas aparecem no nível “Outros”.</figcaption>
+        </figure>
+      </section>
+
+      <!-- 21 -->
+      <section id="problemas">
+        <h2 class="s"><span class="n">21</span>Dúvidas e solução de problemas</h2>
+        <h3>O Windows bloqueou a instalação</h3>
+        <p>Clique em <strong>Mais informações</strong> → <strong>Executar assim mesmo</strong>. O aviso do SmartScreen aparece porque o instalador não tem assinatura digital; ele não indica vírus.</p>
+        <h3>Abri uma pasta e nenhum arquivo apareceu</h3>
+        <p>Só são listados arquivos <code>.log</code>, <code>.txt</code> e rotacionados (<code>.log.1</code>, <code>.txt.2</code>…). Confira a extensão dos seus logs e se você tem permissão de leitura na pasta.</p>
+        <h3>Faltam arquivos em pastas muito grandes</h3>
+        <p>Para não travar em pastas enormes ou de rede, o OctoSearch lista até <strong>5.000 arquivos</strong> e desce até <strong>12 níveis</strong> de subpastas. Abra uma subpasta mais específica.</p>
+        <h3>A busca não encontra um texto que eu sei que existe</h3>
+        <ul>
+          <li>Confira se não há um <strong>nível</strong> (ex.: só ERR) ou um <strong>limite de registros</strong> ativo: eles aparecem como chips.</li>
+          <li>Veja se os conectores estão em <span class="t-and">E</span> quando você queria <strong>OU</strong>.</li>
+          <li>Confira se o arquivo certo está selecionado na lista de arquivos.</li>
+        </ul>
+        <h3>O log está sendo escrito e não atualiza</h3>
+        <p>Ligue o <strong>Tempo real</strong> (bolinha verde) ou clique em <strong>Recarregar</strong>.</p>
+        <h3>A tela pula para o final sozinha</h3>
+        <p>É o <strong>Auto-rolar</strong>, que acompanha as linhas novas. Clique nele para pausar.</p>
+        <h3>Onde ficam minhas pastas, filtros e marcadores?</h3>
+        <p>No seu próprio computador, no perfil do Windows. Eles são mantidos nas atualizações do aplicativo e não são enviados para nenhum servidor.</p>
+        <h3>Como recebo versões novas?</h3>
+        <p>Na versão instalada, automaticamente (<a href="#instalacao">veja Instalação e atualização</a>). Na versão portátil, baixe de novo pelo <a href="index.html#download">site</a>.</p>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    © <span id="year">2026</span> Felipe Santos · <a href="index.html">OctoSearch</a> · Feito com 🐙 para quem vive de logs.
+  </footer>
+
+  <script>
+    (function () {
+      document.getElementById('year').textContent = new Date().getFullYear();
+      var toc = document.getElementById('toc');
+      var toggle = document.querySelector('.menu-toggle');
+      toggle.addEventListener('click', function () {
+        var open = toc.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', String(open));
+      });
+      toc.addEventListener('click', function (e) {
+        if (e.target.closest('a')) { toc.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false'); }
+      });
+      var links = Array.prototype.slice.call(toc.querySelectorAll('a'));
+      var byId = {};
+      links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+      if (!('IntersectionObserver' in window)) return;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          links.forEach(function (a) { a.classList.remove('active'); });
+          var link = byId[entry.target.id];
+          if (link) link.classList.add('active');
+        });
+      }, { rootMargin: '-30% 0px -60% 0px' });
+      document.querySelectorAll('main section[id]').forEach(function (s) { io.observe(s); });
+    })();
+  </script>
+</body>
+</html>
