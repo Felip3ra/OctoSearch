@@ -1,7 +1,7 @@
 {
   "name": "visualizador-de-logs-net",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "OctoSearch - visualizador e pesquisador de arquivos de log",
   "author": "Felipe Santos",
   "type": "module",

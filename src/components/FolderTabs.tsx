@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FolderTab, LogFileItem, SavedFolder } from '../types';
 import { sortFilesByName } from '../utils/fileSorter';
 import { isSupportedLogFileName, nativeFilesToItems } from '../utils/logFile';
+import octoSearchLogo from '../assets/octosearch-logo.png';
 import {
   Folder,
   FolderOpen,
@@ -18,7 +19,6 @@ import {
   ExternalLink,
   Pencil,
   Check,
-  ScanSearch,
   Settings,
 } from 'lucide-react';
 
@@ -249,9 +249,7 @@ export function FolderTabs({
       {/* Row 1: brand, folder tabs and global actions */}
       <div className="flex h-12 items-center gap-2 px-3">
         <div className="flex shrink-0 items-center gap-2 pr-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-sky-500 to-indigo-600 text-white shadow-sm shadow-sky-500/30">
-            <ScanSearch className="h-4 w-4" />
-          </div>
+          <img src={octoSearchLogo} alt="" className="h-8 w-8 shrink-0 select-none drop-shadow-sm" draggable={false} />
           <span className="hidden text-sm font-semibold tracking-tight text-slate-900 sm:inline dark:text-white">OctoSearch</span>
         </div>
 
