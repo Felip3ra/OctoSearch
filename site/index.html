@@ -181,7 +181,7 @@
   <header class="wrap">
     <div class="hero">
       <div>
-        <span class="pill"><i></i>Versão <span data-version>1.0.0</span> disponível para Windows</span>
+        <span class="pill"><i></i>Versão <span data-version>1.0.1</span> disponível para Windows</span>
         <h1>Encontre o erro no seu log <span>em segundos.</span></h1>
         <p class="lead">O OctoSearch é um visualizador de logs para qualquer aplicação — APIs, serviços, servidores, jobs. Abra pastas inteiras, filtre por nível, pesquise com inclusão e exclusão de termos e acompanhe arquivos em tempo real — tudo offline, no seu computador.</p>
         <div class="cta">
@@ -270,7 +270,7 @@
         <div>
           <div class="eyebrow">Download gratuito</div>
           <h2>Baixe o OctoSearch</h2>
-          <p class="sub">Versão <span data-version>1.0.0</span> para Windows 64 bits · <span data-size>113 MB</span></p>
+          <p class="sub">Versão <span data-version>1.0.1</span> para Windows 64 bits · <span data-size>113 MB</span></p>
           <div class="opts">
             <div class="opt">
               <div><strong>Instalador</strong><br /><small>Recomendado. Cria atalhos no menu Iniciar e na área de trabalho.</small></div>
@@ -320,6 +320,23 @@
       });
       if (c.version) document.querySelectorAll('[data-version]').forEach(function (el) { el.textContent = c.version; });
       if (c.sizeLabel) document.querySelectorAll('[data-size]').forEach(function (el) { el.textContent = c.sizeLabel; });
+
+      // A versão e o tamanho vêm da última release do GitHub; os valores do config.js ficam como reserva.
+      if (c.releasesApi && window.fetch) {
+        fetch(c.releasesApi, { headers: { Accept: 'application/vnd.github+json' } })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (release) {
+            if (!release || !release.tag_name) return;
+            var version = release.tag_name.replace(/^v/, '');
+            document.querySelectorAll('[data-version]').forEach(function (el) { el.textContent = version; });
+            var setup = (release.assets || []).filter(function (a) { return a.name === 'OctoSearch-Setup.exe'; })[0];
+            if (setup) {
+              var size = Math.round(setup.size / 1000000) + ' MB';
+              document.querySelectorAll('[data-size]').forEach(function (el) { el.textContent = size; });
+            }
+          })
+          .catch(function () {});
+      }
       document.getElementById('year').textContent = new Date().getFullYear();
 
       var items = document.querySelectorAll('.reveal');
