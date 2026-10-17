@@ -47,6 +47,8 @@ Primeira versão pública.
 
 ## Desenvolvimento
 
+Pipeline de seguranca no Azure DevOps: veja [configuracao, execucao e relatorios](docs/pentest-pipeline.md).
+
 Pré-requisito: [Node.js](https://nodejs.org) LTS.
 
 ```bash

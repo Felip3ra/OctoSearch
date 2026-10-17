@@ -1,0 +1,146 @@
+name: security-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+
+# Em Azure Repos, configure Build validation na politica da branch.
+# Este gatilho de PR funciona para repositorios GitHub/Bitbucket conectados.
+pr:
+  branches:
+    include:
+      - main
+
+schedules:
+  - cron: '0 9 * * 1'
+    displayName: Segunda-feira, 06h em Sao Paulo (09h UTC)
+    branches:
+      include:
+        - main
+    always: true
+
+parameters:
+  - name: activeScan
+    displayName: Executar ZAP ativo na copia local (somente execucao manual)
+    type: boolean
+    default: false
+
+pool:
+  vmImage: ubuntu-24.04
+
+variables:
+  nodeVersion: '24.x'
+  semgrepImage: 'semgrep/semgrep:1.181.0'
+  zapImage: 'ghcr.io/zaproxy/zaproxy:2.17.0'
+
+jobs:
+  - job: Dependencies
+    displayName: Dependencias (npm audit)
+    timeoutInMinutes: 15
+    steps:
+      - checkout: self
+        persistCredentials: false
+      - task: UseNode@1
+        inputs:
+          version: $(nodeVersion)
+      - bash: |
+          set -euo pipefail
+          mkdir -p "$REPORT_DIR"
+          npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+          npm audit --include=dev --audit-level=high --json > "$REPORT_DIR/npm-audit.json"
+        displayName: Bloquear vulnerabilidades altas e criticas, incluindo ferramentas de build
+        env:
+          REPORT_DIR: $(Build.ArtifactStagingDirectory)/dependencies
+      - task: PublishPipelineArtifact@1
+        condition: succeededOrFailed()
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/dependencies
+          artifact: security-dependencies
+
+  - job: SAST
+    displayName: Codigo (Semgrep)
+    timeoutInMinutes: 15
+    steps:
+      - checkout: self
+        persistCredentials: false
+      - bash: |
+          set -euo pipefail
+          mkdir -p "$REPORT_DIR"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp -e SEMGREP_SEND_METRICS=off \
+            -v "$SOURCE_DIR:/src:ro" -v "$REPORT_DIR:/reports" -w /src \
+            "$SEMGREP_IMAGE" semgrep scan \
+            --config p/security-audit --config p/javascript --config p/react \
+            --metrics=off --disable-version-check --strict --error \
+            --exclude site/manual --json --output /reports/semgrep.json .
+        displayName: Analisar JavaScript, TypeScript, React e Electron
+        env:
+          SOURCE_DIR: $(Build.SourcesDirectory)
+          REPORT_DIR: $(Build.ArtifactStagingDirectory)/sast
+          SEMGREP_IMAGE: $(semgrepImage)
+      - task: PublishPipelineArtifact@1
+        condition: succeededOrFailed()
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/sast
+          artifact: security-sast
+
+  - job: Secrets
+    displayName: Segredos no historico (Gitleaks)
+    timeoutInMinutes: 15
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        persistCredentials: false
+      - bash: |
+          set -euo pipefail
+          mkdir -p "$REPORT_DIR" "$TOOL_DIR"
+          cd "$TOOL_DIR"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output gitleaks.tar.gz
+          echo '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz' | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks git "$SOURCE_DIR" --log-opts=--all --redact=100 \
+            --report-format json --report-path "$REPORT_DIR/gitleaks.json" --exit-code 1
+        displayName: Detectar segredos com valores ocultos no log e no relatorio
+        env:
+          SOURCE_DIR: $(Build.SourcesDirectory)
+          REPORT_DIR: $(Build.ArtifactStagingDirectory)/secrets
+          TOOL_DIR: $(Agent.TempDirectory)/gitleaks
+      - task: PublishPipelineArtifact@1
+        condition: succeededOrFailed()
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/secrets
+          artifact: security-secrets
+
+  - job: DAST
+    displayName: Interface local (OWASP ZAP)
+    timeoutInMinutes: 35
+    steps:
+      - checkout: self
+        persistCredentials: false
+      - task: UseNode@1
+        inputs:
+          version: $(nodeVersion)
+      - bash: |
+          set -euo pipefail
+          mkdir -p "$REPORT_DIR"
+          npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+          npm run lint
+          npm run build
+        displayName: Verificar tipos e gerar interface de producao
+        env:
+          REPORT_DIR: $(Build.ArtifactStagingDirectory)/dast
+      - bash: bash scripts/security/run-zap.sh
+        displayName: Executar ZAP e aplicar limite de severidade
+        env:
+          ACTIVE_SCAN: '${{ parameters.activeScan }}'
+          BUILD_REASON: $(Build.Reason)
+          REPORT_DIR: $(Build.ArtifactStagingDirectory)/dast
+          ZAP_IMAGE: $(zapImage)
+      - task: PublishPipelineArtifact@1
+        condition: succeededOrFailed()
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/dast
+          artifact: security-dast
