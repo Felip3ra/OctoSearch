@@ -1,0 +1,59 @@
+# Gera o AppImage e o .deb do OctoSearch num runner Ubuntu.
+# - push na main: só gera e guarda os pacotes como artefato (valida o build Linux).
+# - release publicada (criada pelo publicar-atualizacao.bat): gera e anexa os pacotes à release.
+# Também pode ser disparado à mão em Actions → "Release Linux".
+name: Release Linux
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'site/**'
+      - 'docs/**'
+      - '**/*.md'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verificar tipos, lint e testes
+        run: |
+          npm run lint
+          npm test
+
+      - name: Gerar AppImage e .deb
+        if: github.event_name != 'release'
+        run: npm run build:linux
+
+      - name: Gerar AppImage e .deb e enviar para a release
+        if: github.event_name == 'release'
+        run: npm run release:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guardar os pacotes como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: octosearch-linux
+          path: |
+            dist-exe/*.AppImage
+            dist-exe/*.deb
+            dist-exe/latest-linux.yml
+          if-no-files-found: error

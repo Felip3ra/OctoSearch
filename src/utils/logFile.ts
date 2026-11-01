@@ -2,10 +2,10 @@ import { LogFileItem } from '../types';
 
 /**
  * Accepts regular log files and common numeric rotations:
- * application.log, application.txt, application.log.1, application.txt.12.
+ * application.log, application.txt, application.log.1, application.txt.12 and gzip rotations (application.log.1.gz).
  */
 export function isSupportedLogFileName(fileName: string): boolean {
-  return /\.(?:log|txt)(?:\.\d+)?$/i.test(fileName.trim());
+  return /\.(?:log|txt)(?:\.\d+)?(?:\.gz)?$/i.test(fileName.trim());
 }
 
 type NativeFile = Awaited<ReturnType<NonNullable<Window['electronAPI']>['readFolder']>>[number];

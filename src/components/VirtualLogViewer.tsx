@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { HighlightRule, LogEntry } from '../types';
+import { HighlightRule, LogEntry, SearchPattern } from '../types';
+import { createAnyPatternMatcher } from '../services/logSearch';
 import { LogEntryRow } from './LogEntryRow';
 import { SearchX, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { normalizeHighlightColor } from '../utils/highlightColor';
@@ -7,7 +8,7 @@ import { normalizeHighlightColor } from '../utils/highlightColor';
 interface VirtualLogViewerProps {
   entries: LogEntry[];
   allEntries?: LogEntry[];
-  searchTerms: string[];
+  searchTerms: SearchPattern[];
   autoScroll?: boolean;
   highlightRules?: HighlightRule[];
   wordWrap?: boolean;
@@ -24,6 +25,9 @@ const BASE_ROW_HEIGHT = 34;
 const LINE_HEIGHT_STACK = 21;
 const STACK_CONTAINER_PADDING = 38;
 const OVERSCAN = 15;
+// Browsers cap element heights (~33.5M px in Chromium). Taller lists are drawn in a shorter scroll
+// area and the scroll position is mapped proportionally onto the real row positions.
+const MAX_SCROLL_HEIGHT = 10_000_000;
 
 export function VirtualLogViewer({
   entries,
@@ -46,16 +50,11 @@ export function VirtualLogViewer({
   // Auto-expand items when searching inside their stack trace
   useEffect(() => {
     if (searchTerms.length === 0) return;
-    const lowerSearchTerms = searchTerms.map((term) => term.toLowerCase());
+    const matches = createAnyPatternMatcher(searchTerms);
     const matchingIds = new Set<number>();
 
     entries.forEach((entry) => {
-      if (
-        entry.hasStackTrace &&
-        entry.stackTrace.some((line) =>
-          lowerSearchTerms.some((term) => line.toLowerCase().includes(term))
-        )
-      ) {
+      if (entry.hasStackTrace && entry.stackTrace.some(matches)) {
         matchingIds.add(entry.id);
       }
     });
@@ -151,16 +150,25 @@ export function VirtualLogViewer({
     return { positions: pos, totalHeight: currentY };
   }, [entries, expandedIds, measuredHeights, wordWrap]);
 
+  const scrollHeight = Math.min(totalHeight, MAX_SCROLL_HEIGHT);
+  const scrollRatio =
+    totalHeight > scrollHeight && scrollHeight > containerHeight
+      ? (totalHeight - containerHeight) / (scrollHeight - containerHeight)
+      : 1;
+  /** Position in the full (unscaled) list that is shown at the top of the viewport. */
+  const virtualScrollTop = scrollTop * scrollRatio;
+  const toScrollTop = useCallback((virtualY: number) => virtualY / scrollRatio, [scrollRatio]);
+
   // Auto-scroll to bottom when new entries arrive if autoScroll is enabled
   useEffect(() => {
     if (autoScroll && entries.length > 0) {
       const el = containerRef.current;
       if (el) {
-        el.scrollTop = totalHeight;
+        el.scrollTop = scrollHeight;
       }
     }
     prevCountRef.current = entries.length;
-  }, [entries.length, autoScroll, totalHeight]);
+  }, [entries.length, autoScroll, scrollHeight]);
 
   // Binary search to find start index
   const { startIndex, endIndex, offsetY } = useMemo(() => {
@@ -176,7 +184,7 @@ export function VirtualLogViewer({
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
-      if (positions[mid] < scrollTop) {
+      if (positions[mid] < virtualScrollTop) {
         start = mid;
         low = mid + 1;
       } else {
@@ -187,7 +195,7 @@ export function VirtualLogViewer({
     start = Math.max(0, start - OVERSCAN);
 
     // Find end index
-    const targetY = scrollTop + containerHeight;
+    const targetY = virtualScrollTop + containerHeight;
     let end = start;
     while (end < count && positions[end] < targetY) {
       end++;
@@ -197,21 +205,31 @@ export function VirtualLogViewer({
     return {
       startIndex: start,
       endIndex: end,
-      offsetY: positions[start] || 0,
+      // Rows are placed relative to the real scroll position, so scaling never shows.
+      offsetY: scrollTop + (positions[start] || 0) - virtualScrollTop,
     };
-  }, [entries.length, positions, scrollTop, containerHeight]);
+  }, [entries.length, positions, scrollTop, virtualScrollTop, containerHeight]);
 
   const visibleEntries = useMemo(() => {
     return entries.slice(startIndex, endIndex);
   }, [entries, startIndex, endIndex]);
 
-  const allEntryIndex = useMemo(() => {
-    const index = new Map<number, number>();
-    allEntries.forEach((entry, position) => index.set(entry.id, position));
-    return index;
+  // Ids are usually the 1-based position in the timeline; the full map is only built when they are not.
+  const indexOfEntry = useMemo(() => {
+    const count = allEntries.length;
+    const sequential = count === 0 || (allEntries[0].id === 1 && allEntries[count - 1].id === count);
+    const positions = sequential ? null : new Map(allEntries.map((entry, position) => [entry.id, position]));
+    return (id: number): number | undefined => {
+      if (positions) return positions.get(id);
+      return allEntries[id - 1]?.id === id ? id - 1 : undefined;
+    };
   }, [allEntries]);
 
-  const filteredEntryIds = useMemo(() => new Set(entries.map((entry) => entry.id)), [entries]);
+  // null when nothing is filtered out (no need to index millions of ids).
+  const filteredIds = useMemo(
+    () => (entries.length === allEntries.length ? null : new Set(entries.map((entry) => entry.id))),
+    [entries, allEntries]
+  );
 
   const minimapItems = useMemo(() => {
     if (allEntries.length === 0) return [];
@@ -224,7 +242,7 @@ export function VirtualLogViewer({
 
     const filteredStep = Math.max(1, Math.ceil(entries.length / 420));
     for (let index = 0; index < entries.length; index += filteredStep) {
-      const originalIndex = allEntryIndex.get(entries[index].id);
+      const originalIndex = indexOfEntry(entries[index].id);
       if (originalIndex !== undefined) sampledIndexes.add(originalIndex);
     }
 
@@ -238,7 +256,7 @@ export function VirtualLogViewer({
             ? entry.rawText.includes(rule.text)
             : entry.rawText.toLocaleLowerCase('pt-BR').includes(rule.text.toLocaleLowerCase('pt-BR'));
         });
-        const isFiltered = filteredEntryIds.has(entry.id);
+        const isFiltered = filteredIds ? filteredIds.has(entry.id) : true;
         const width = 24 + Math.min(72, Math.round((Math.min(entry.rawText.length, 220) / 220) * 72));
         return {
           id: entry.id,
@@ -249,7 +267,7 @@ export function VirtualLogViewer({
           highlightColor: highlightRule?.color,
         };
       });
-  }, [allEntries, allEntryIndex, entries, filteredEntryIds, highlightRules]);
+  }, [allEntries, indexOfEntry, entries, filteredIds, highlightRules]);
 
   const viewportBounds = useMemo(() => {
     if (entries.length === 0 || allEntries.length === 0) return { top: 0, height: 100 };
@@ -259,7 +277,7 @@ export function VirtualLogViewer({
     let high = entries.length - 1;
     while (low <= high) {
       const middle = Math.floor((low + high) / 2);
-      if (positions[middle] <= scrollTop) {
+      if (positions[middle] <= virtualScrollTop) {
         firstVisible = middle;
         low = middle + 1;
       } else {
@@ -268,17 +286,17 @@ export function VirtualLogViewer({
     }
 
     let lastVisible = firstVisible;
-    const viewportEnd = scrollTop + containerHeight;
+    const viewportEnd = virtualScrollTop + containerHeight;
     while (lastVisible < entries.length - 1 && positions[lastVisible] < viewportEnd) {
       lastVisible++;
     }
 
-    const firstOriginal = allEntryIndex.get(entries[firstVisible].id) ?? 0;
-    const lastOriginal = allEntryIndex.get(entries[lastVisible].id) ?? firstOriginal;
+    const firstOriginal = indexOfEntry(entries[firstVisible].id) ?? 0;
+    const lastOriginal = indexOfEntry(entries[lastVisible].id) ?? firstOriginal;
     const top = (firstOriginal / Math.max(1, allEntries.length)) * 100;
     const rawHeight = ((lastOriginal - firstOriginal + 1) / Math.max(1, allEntries.length)) * 100;
     return { top, height: Math.max(3, Math.min(100 - top, rawHeight)) };
-  }, [allEntries.length, allEntryIndex, containerHeight, entries, positions, scrollTop]);
+  }, [allEntries.length, indexOfEntry, containerHeight, entries, positions, virtualScrollTop]);
 
   const handleMinimapClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     if (!containerRef.current || entries.length === 0 || allEntries.length === 0) return;
@@ -291,7 +309,7 @@ export function VirtualLogViewer({
     let closest = 0;
     while (low <= high) {
       const middle = Math.floor((low + high) / 2);
-      const originalIndex = allEntryIndex.get(entries[middle].id) ?? 0;
+      const originalIndex = indexOfEntry(entries[middle].id) ?? 0;
       closest = middle;
       if (originalIndex < targetOriginalIndex) low = middle + 1;
       else if (originalIndex > targetOriginalIndex) high = middle - 1;
@@ -299,13 +317,13 @@ export function VirtualLogViewer({
     }
 
     const previous = Math.max(0, closest - 1);
-    const closestOriginal = allEntryIndex.get(entries[closest].id) ?? 0;
-    const previousOriginal = allEntryIndex.get(entries[previous].id) ?? 0;
+    const closestOriginal = indexOfEntry(entries[closest].id) ?? 0;
+    const previousOriginal = indexOfEntry(entries[previous].id) ?? 0;
     const targetIndex = Math.abs(previousOriginal - targetOriginalIndex) < Math.abs(closestOriginal - targetOriginalIndex)
       ? previous
       : closest;
-    containerRef.current.scrollTo({ top: positions[targetIndex] || 0, behavior: 'smooth' });
-  }, [allEntries.length, allEntryIndex, entries, positions]);
+    containerRef.current.scrollTo({ top: toScrollTop(positions[targetIndex] || 0), behavior: 'smooth' });
+  }, [allEntries.length, indexOfEntry, entries, positions, toScrollTop]);
 
   const findHighlightRule = useCallback(
     (entry: LogEntry) =>
@@ -326,7 +344,7 @@ export function VirtualLogViewer({
 
   const scrollToBottom = () => {
     if (containerRef.current) {
-      containerRef.current.scrollTo({ top: totalHeight, behavior: 'smooth' });
+      containerRef.current.scrollTo({ top: scrollHeight, behavior: 'smooth' });
     }
   };
 
@@ -376,7 +394,7 @@ export function VirtualLogViewer({
           style={{ position: 'relative' }}
         >
           {/* Placeholder element to set total scroll height */}
-          <div style={{ height: `${totalHeight}px`, width: '100%', position: 'relative' }}>
+          <div style={{ height: `${scrollHeight}px`, width: '100%', position: 'relative' }}>
             {/* Slice of rendered items */}
             <div
               style={{
@@ -415,7 +433,7 @@ export function VirtualLogViewer({
           aria-label="Prévia de rolagem do log"
           aria-valuemin={0}
           aria-valuemax={Math.max(0, allEntries.length - 1)}
-          aria-valuenow={allEntryIndex.get(entries[Math.min(entries.length - 1, startIndex)]?.id) || 0}
+          aria-valuenow={indexOfEntry(entries[Math.min(entries.length - 1, startIndex)]?.id ?? 0) || 0}
         >
           <div className="absolute inset-y-0 left-1 right-2 overflow-hidden opacity-80">
             {minimapItems.map((item) => {

@@ -9,18 +9,7 @@
     <meta property="og:description" content="Aplicativo para leitura, pesquisa e análise de arquivos de log." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <script>
-      try {
-        const savedTheme = localStorage.getItem('log-viewer-theme');
-        const useDarkTheme = savedTheme
-          ? savedTheme === 'dark'
-          : window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.classList.toggle('dark', useDarkTheme);
-        document.documentElement.style.colorScheme = useDarkTheme ? 'dark' : 'light';
-      } catch (_) {
-        // The application still works if browser storage is unavailable.
-      }
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OctoSearch — Visualizador de logs</title>
-  <meta name="description" content="OctoSearch: leia, pesquise e analise qualquer arquivo de log no Windows. Download gratuito." />
+  <meta name="description" content="OctoSearch: leia, pesquise e analise qualquer arquivo de log no Windows e no Linux. Download gratuito." />
   <meta property="og:title" content="OctoSearch — Visualizador de logs" />
-  <meta property="og:description" content="Leia, pesquise e analise qualquer arquivo de log em segundos. Download gratuito para Windows." />
+  <meta property="og:description" content="Leia, pesquise e analise qualquer arquivo de log em segundos. Download gratuito para Windows e Linux." />
   <meta property="og:image" content="https://octosearch-omega.vercel.app/og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#0b1530" />
@@ -131,6 +131,7 @@
     .opt strong { font-size: 15px; }
     .opt small { color: var(--muted); font-size: 13px; }
     .req { margin-top: 22px; font-size: 13px; color: var(--muted); }
+    .opt code, .faq code { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; background: #ffffff10; border-radius: 5px; padding: 1px 5px; word-break: break-all; }
 
     details { border-bottom: 1px solid var(--line); padding: 18px 0; }
     summary { cursor: pointer; font-weight: 600; font-size: 16px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
@@ -181,7 +182,7 @@
   <header class="wrap">
     <div class="hero">
       <div>
-        <span class="pill"><i></i>Versão <span data-version>1.0.1</span> disponível para Windows</span>
+        <span class="pill"><i></i>Versão <span data-version>1.1.0</span> para Windows e Linux</span>
         <h1>Encontre o erro no seu log <span>em segundos.</span></h1>
         <p class="lead">O OctoSearch é um visualizador de logs para qualquer aplicação — APIs, serviços, servidores, jobs. Abra pastas inteiras, filtre por nível, pesquise com inclusão e exclusão de termos e acompanhe arquivos em tempo real — tudo offline, no seu computador.</p>
         <div class="cta">
@@ -191,7 +192,7 @@
           </a>
           <a class="btn btn-ghost" href="#recursos">Ver recursos</a>
         </div>
-        <div class="meta"><span>Gratuito</span><span>100% offline</span><span>Windows 10 e 11</span></div>
+        <div class="meta"><span>Gratuito</span><span>100% offline</span><span>Windows 10 e 11</span><span>Linux 64 bits</span></div>
       </div>
       <div class="hero-logo"><img src="logo-512.png" alt="Mascote do OctoSearch: um polvo detetive com lupa" width="256" height="256" /></div>
     </div>
@@ -241,12 +242,15 @@
       <h2>Tudo o que você precisa para investigar logs</h2>
       <p class="sub">Feito para quem passa o dia caçando erros em arquivos .log e .txt — de qualquer linguagem, framework ou servidor.</p>
       <div class="grid">
-        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><h3>Pesquisa com inclusão e exclusão</h3><p>Enter inclui um termo, Shift+Enter exclui. Combine vários filtros e esconda o ruído na hora.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><h3>Pesquisa com inclusão e exclusão</h3><p>Enter inclui um termo, Shift+Enter exclui. Combine vários filtros com E/OU, use expressões regulares ou diferencie maiúsculas.</p></div>
         <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg></div><h3>Filtro por nível</h3><p>Veja só ERR, WRN, INF ou DBG com um clique. A stack trace acompanha cada registro.</p></div>
         <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h7v7H4zM13 13h7v7h-7zM13 4h7v7h-7zM4 13h7v7H4z"/></svg></div><h3>Vários arquivos juntos</h3><p>Selecione vários logs e veja tudo mesclado em ordem cronológica, cada origem com sua cor.</p></div>
         <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h6l2 2h10v10H3z"/></svg></div><h3>Pastas inteiras e salvas</h3><p>Abra uma pasta e o OctoSearch encontra os logs nas subpastas. Salve suas pastas favoritas em abas.</p></div>
         <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg></div><h3>Marcadores coloridos</h3><p>Crie regras que destacam linhas por texto — IDs de pedido, usuários, endpoints críticos.</p></div>
-        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div><h3>Rápido com arquivos grandes</h3><p>Renderização virtualizada, auto-rolagem que acompanha a última linha e modo claro/escuro.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div><h3>Rápido com arquivos grandes</h3><p>Processamento em segundo plano, tempo real que lê só as linhas novas e milhões de registros sem travar a tela.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div><h3>Filtro por período</h3><p>Mostre só o que aconteceu entre dois horários ou nos últimos 15 minutos, 1 hora ou 24 horas do log.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg></div><h3>Exportar o resultado</h3><p>Salve os registros filtrados em .log ou em .csv pronto para abrir no Excel, com data, nível e mensagem.</p></div>
+        <div class="card reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16v13H4zM9 7V4h6v3"/></svg></div><h3>.gz, UTF-16 e acentos</h3><p>Abre rotações compactadas (app.log.1.gz) e detecta a codificação: UTF-8, UTF-16 ou Windows-1252.</p></div>
       </div>
     </div>
   </section>
@@ -270,7 +274,7 @@
         <div>
           <div class="eyebrow">Download gratuito</div>
           <h2>Baixe o OctoSearch</h2>
-          <p class="sub">Versão <span data-version>1.0.1</span> para Windows 64 bits · <span data-size>113 MB</span></p>
+          <p class="sub">Versão <span data-version>1.1.0</span> para Windows e Linux (64 bits) · instalador Windows <span data-size>113 MB</span></p>
           <div class="opts">
             <div class="opt">
               <div><strong>Instalador</strong><br /><small>Recomendado. Cria atalhos no menu Iniciar e na área de trabalho.</small></div>
@@ -283,8 +287,16 @@
               <div><strong>Portátil</strong><br /><small>Um único .exe, sem instalação. Ideal para pen drive ou servidores.</small></div>
               <a class="btn btn-ghost" data-download="portable" href="#">Baixar portátil</a>
             </div>
+            <div class="opt">
+              <div><strong>Linux · AppImage</strong><br /><small>Roda em qualquer distribuição e se atualiza sozinho. Dê permissão de execução e abra.</small></div>
+              <a class="btn btn-ghost" data-download="appimage" href="#">Baixar AppImage</a>
+            </div>
+            <div class="opt">
+              <div><strong>Linux · .deb</strong><br /><small>Para Ubuntu, Debian e derivados. Instale com <code>sudo apt install ./OctoSearch-amd64.deb</code>.</small></div>
+              <a class="btn btn-ghost" data-download="deb" href="#">Baixar .deb</a>
+            </div>
           </div>
-          <p class="req">Requisitos: Windows 10 ou 11 (64 bits). Se o Windows SmartScreen exibir um aviso, clique em “Mais informações” → “Executar assim mesmo”.</p>
+          <p class="req">Requisitos: Windows 10 ou 11 (64 bits), ou Linux 64 bits (Ubuntu 22.04+, Debian 12+, Fedora 38+ ou equivalente). Se o Windows SmartScreen exibir um aviso, clique em “Mais informações” → “Executar assim mesmo”.</p>
         </div>
         <img src="logo-256.png" alt="" />
       </div>
@@ -297,8 +309,10 @@
       <h2>Perguntas frequentes</h2>
       <details><summary>O OctoSearch é gratuito?</summary><p>Sim. Você pode baixar e usar sem custo.</p></details>
       <details><summary>Meus logs são enviados para a internet?</summary><p>Não. O aplicativo roda 100% no seu computador e lê os arquivos diretamente do disco.</p></details>
-      <details><summary>Quais formatos de arquivo são suportados?</summary><p>Arquivos .log e .txt, incluindo arquivos rotacionados como app.log.1. Data, hora e nível (ERROR, WARN, INFO, DEBUG…) são reconhecidos automaticamente nos formatos mais comuns, inclusive logs em JSON. Arquivos em outros formatos são exibidos linha a linha, com busca e filtros normalmente.</p></details>
+      <details><summary>Quais formatos de arquivo são suportados?</summary><p>Arquivos .log e .txt, incluindo arquivos rotacionados como app.log.1 e compactados como app.log.1.gz. A codificação (UTF-8, UTF-16 ou Windows-1252) é detectada sozinha. Data, hora e nível (ERROR, WARN, INFO, DEBUG…) são reconhecidos automaticamente nos formatos mais comuns, inclusive logs em JSON. Arquivos em outros formatos são exibidos linha a linha, com busca e filtros normalmente.</p></details>
       <details><summary>Funciona com pastas de rede?</summary><p>Sim. A varredura é assíncrona e percorre subpastas sem travar a janela.</p></details>
+      <details><summary>Funciona no Linux?</summary><p>Sim. Baixe o AppImage (qualquer distribuição, com atualização automática) ou o .deb (Ubuntu/Debian). No AppImage, marque o arquivo como executável (<code>chmod +x OctoSearch-x86_64.AppImage</code>); em distribuições sem FUSE 2, instale o pacote <code>libfuse2</code>.</p></details>
+      <details><summary>O OctoSearch pode ler qualquer arquivo do meu computador?</summary><p>Não. O aplicativo só lê arquivos de log (.log, .txt e .gz) dentro das pastas que você abriu ou autorizou. Ao abrir uma pasta salva pela primeira vez, ele pede sua confirmação.</p></details>
       <details><summary>Por que o Windows mostra um aviso ao abrir?</summary><p>O instalador ainda não tem assinatura digital, então o SmartScreen pode alertar na primeira execução. Clique em “Mais informações” e depois em “Executar assim mesmo”.</p></details>
     </div>
   </section>
@@ -315,7 +329,8 @@
     (function () {
       var c = window.OCTO_CONFIG || {};
       document.querySelectorAll('[data-download]').forEach(function (a) {
-        var url = a.dataset.download === 'portable' ? c.portableUrl : c.installerUrl;
+        var urls = { installer: c.installerUrl, portable: c.portableUrl, appimage: c.appImageUrl, deb: c.debUrl };
+        var url = urls[a.dataset.download];
         if (url) { a.href = url; a.setAttribute('rel', 'noopener'); }
       });
       if (c.version) document.querySelectorAll('[data-version]').forEach(function (el) { el.textContent = c.version; });

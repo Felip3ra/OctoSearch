@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Manual do OctoSearch</title>
-  <meta name="description" content="Manual completo do OctoSearch: instalação, abertura de pastas, busca com E/OU, filtros salvos, marcadores, tempo real, atalhos e formatos de log suportados." />
+  <meta name="description" content="Manual completo do OctoSearch: instalação no Windows e no Linux, abertura de pastas, busca com E/OU e expressões regulares, filtro por período, exportação, filtros salvos, marcadores, tempo real, atalhos e formatos de log suportados." />
   <meta property="og:title" content="Manual do OctoSearch" />
   <meta property="og:description" content="Guia completo, com prints, de todas as funções do OctoSearch." />
   <meta property="og:image" content="https://octosearch-omega.vercel.app/og-image.png" />
@@ -162,11 +162,11 @@
         <li><a href="#registros">Lendo os registros</a></li>
         <li><a href="#busca">Busca: incluir e excluir</a></li>
         <li><a href="#e-ou">Combinando com E e OU</a></li>
-        <li><a href="#nivel-limite">Nível e limite de registros</a></li>
+        <li><a href="#nivel-limite">Nível, período e limite</a></li>
         <li><a href="#filtros-salvos">Filtros salvos</a></li>
         <li><a href="#marcadores">Marcadores coloridos</a></li>
         <li><a href="#quebra">Quebra de linha</a></li>
-        <li><a href="#tempo-real">Tempo real, recarregar e copiar</a></li>
+        <li><a href="#tempo-real">Tempo real, copiar e exportar</a></li>
         <li><a href="#status">Barra de status</a></li>
         <li><a href="#configuracoes">Configurações e tema</a></li>
         <li><a href="#atalhos">Atalhos de teclado</a></li>
@@ -181,8 +181,8 @@
         <h1>Manual do OctoSearch</h1>
         <p>Tudo o que o OctoSearch faz, passo a passo e com telas reais: desde abrir a primeira pasta até combinar buscas com E/OU, salvar filtros e acompanhar logs em tempo real.</p>
         <div class="meta">
-          <span class="chip">Versão 1.0.2</span>
-          <span class="chip">Windows 10 e 11</span>
+          <span class="chip">Versão 1.1.0</span>
+          <span class="chip">Windows 10 e 11 · Linux 64 bits</span>
           <span class="chip">Os exemplos usam logs fictícios de uma loja online</span>
         </div>
       </div>
@@ -190,28 +190,31 @@
       <!-- 1 -->
       <section id="introducao">
         <h2 class="s"><span class="n">01</span>Introdução</h2>
-        <p>O <strong>OctoSearch</strong> é um visualizador de arquivos de log para Windows. Ele lê arquivos <code>.log</code> e <code>.txt</code> de qualquer aplicação (APIs, serviços, servidores, jobs), reconhece data, hora e nível de cada registro e permite encontrar o que importa em segundos.</p>
+        <p>O <strong>OctoSearch</strong> é um visualizador de arquivos de log para Windows e Linux. Ele lê arquivos <code>.log</code>, <code>.txt</code> e rotações compactadas <code>.gz</code> de qualquer aplicação (APIs, serviços, servidores, jobs), reconhece data, hora e nível de cada registro e permite encontrar o que importa em segundos.</p>
         <ul>
           <li><strong>Abra pastas inteiras</strong>, inclusive com subpastas e em caminhos de rede.</li>
           <li><strong>Veja vários arquivos juntos</strong>, mesclados em ordem cronológica.</li>
-          <li><strong>Busque incluindo e excluindo termos</strong> e combine-os com <span class="t-and">E</span> e <strong>OU</strong>.</li>
+          <li><strong>Busque incluindo e excluindo termos</strong>, combine-os com <span class="t-and">E</span> e <strong>OU</strong> e use expressões regulares.</li>
+          <li><strong>Filtre por período</strong> (por exemplo, os últimos 15 minutos do log) e <strong>exporte</strong> o resultado para <code>.log</code> ou <code>.csv</code>.</li>
           <li><strong>Salve filtros</strong> com nome e grupo, e <strong>destaque linhas</strong> com marcadores coloridos.</li>
           <li><strong>Acompanhe em tempo real</strong> os arquivos que estão sendo escritos.</li>
         </ul>
         <div class="note">
-          <p><strong>Seus logs não saem do seu computador.</strong> O OctoSearch funciona 100% offline e lê os arquivos diretamente do disco.</p>
+          <p><strong>Seus logs não saem do seu computador.</strong> O OctoSearch funciona 100% offline e lê os arquivos diretamente do disco. Ele só consegue ler arquivos de log dentro das pastas que você abriu ou autorizou.</p>
         </div>
       </section>
 
       <!-- 2 -->
       <section id="instalacao">
         <h2 class="s"><span class="n">02</span>Instalação e atualização</h2>
-        <p class="lead">Há duas versões, ambas gratuitas, na <a href="index.html#download">página de download</a>.</p>
+        <p class="lead">Há versões para Windows e para Linux, todas gratuitas, na <a href="index.html#download">página de download</a>.</p>
         <div class="table-wrap">
           <table>
             <tr><th>Versão</th><th>Quando usar</th><th>Atualização automática</th></tr>
             <tr><td><strong>Instalador</strong> (<code>OctoSearch-Setup.exe</code>)</td><td>Uso diário no seu computador. Cria atalhos no menu Iniciar e na área de trabalho.</td><td>Sim</td></tr>
             <tr><td><strong>Portátil</strong> (<code>OctoSearch.exe</code>)</td><td>Pen drive, servidores ou máquinas onde você não pode instalar programas.</td><td>Não: baixe de novo pelo site</td></tr>
+            <tr><td><strong>Linux AppImage</strong> (<code>OctoSearch-x86_64.AppImage</code>)</td><td>Qualquer distribuição Linux 64 bits. Um arquivo só, sem instalação.</td><td>Sim</td></tr>
+            <tr><td><strong>Linux .deb</strong> (<code>OctoSearch-amd64.deb</code>)</td><td>Ubuntu, Debian, Mint e derivados. Fica no menu de aplicativos.</td><td>Não: instale o .deb novo</td></tr>
           </table>
         </div>
         <h3>Instalando</h3>
@@ -220,8 +223,13 @@
           <li>Se o Windows mostrar <em>“O Windows protegeu o computador”</em>, clique em <strong>Mais informações</strong> e depois em <strong>Executar assim mesmo</strong>. O aviso aparece porque o instalador ainda não tem assinatura digital.</li>
           <li>Escolha a pasta de instalação (ou mantenha a sugerida) e conclua. O OctoSearch abre ao terminar.</li>
         </ol>
+        <h3>Instalando no Linux</h3>
+        <ul>
+          <li><strong>AppImage</strong>: dê permissão de execução (<code>chmod +x OctoSearch-x86_64.AppImage</code>, ou clique com o botão direito → Propriedades → Permitir executar) e abra o arquivo. Se a distribuição não tiver FUSE 2, instale o pacote <code>libfuse2</code> (Ubuntu 22.04+: <code>sudo apt install libfuse2</code>).</li>
+          <li><strong>.deb</strong>: <code>sudo apt install ./OctoSearch-amd64.deb</code>. O OctoSearch aparece no menu de aplicativos.</li>
+        </ul>
         <h3>Atualizações</h3>
-        <p>Na versão instalada, o OctoSearch procura versões novas sempre que é aberto e, se ficar aberto, a cada 6 horas. Quando encontra, baixa em segundo plano e mostra o aviso <strong>“Atualização disponível”</strong>:</p>
+        <p>No instalador do Windows e no AppImage, o OctoSearch procura versões novas sempre que é aberto e, se ficar aberto, a cada 6 horas. Quando encontra, baixa em segundo plano e mostra o aviso <strong>“Atualização disponível”</strong>:</p>
         <ul>
           <li><strong>Reiniciar agora</strong>: fecha, instala e abre a nova versão.</li>
           <li><strong>Depois</strong>: a atualização é instalada automaticamente quando você fechar o aplicativo.</li>
@@ -241,9 +249,9 @@
           <li><b class="num">2</b><span><strong>Tema e configurações</strong>: alterna claro/escuro e abre as configurações. <a href="#configuracoes">Ver configurações</a></span></li>
           <li><b class="num">3</b><span><strong>Pasta atual</strong>: caminho da pasta, estrela de favorito, <strong>Pastas salvas</strong> e <strong>Abrir pasta</strong>. <a href="#abrir">Ver abrir logs</a></span></li>
           <li><b class="num">4</b><span><strong>Lista de arquivos</strong>: os logs encontrados na pasta e nas subpastas. <a href="#arquivos">Ver lista de arquivos</a></span></li>
-          <li><b class="num">5</b><span><strong>Busca e limite</strong>: incluir/excluir termos e limitar a quantidade de registros. <a href="#busca">Ver busca</a></span></li>
+          <li><b class="num">5</b><span><strong>Busca, período e limite</strong>: incluir/excluir termos (com maiúsculas e expressão regular), filtrar por período e limitar a quantidade de registros. <a href="#busca">Ver busca</a></span></li>
           <li><b class="num">6</b><span><strong>Níveis</strong>: filtra por ERR, WRN, INF, DBG ou Outros, com a contagem de cada um. <a href="#nivel-limite">Ver níveis</a></span></li>
-          <li><b class="num">7</b><span><strong>Ferramentas</strong>: filtros salvos, marcadores, quebra de linha, tempo real, recarregar e copiar. <a href="#tempo-real">Ver ferramentas</a></span></li>
+          <li><b class="num">7</b><span><strong>Ferramentas</strong>: filtros salvos, marcadores, quebra de linha, tempo real, recarregar, copiar e exportar. <a href="#tempo-real">Ver ferramentas</a></span></li>
           <li><b class="num">8</b><span><strong>Visualizador</strong>: os registros do log, com data, nível, mensagem e stack trace. <a href="#registros">Ver registros</a></span></li>
           <li><b class="num">9</b><span><strong>Prévia do log</strong>: miniatura de todo o conteúdo; clique para pular para aquele ponto.</span></li>
           <li><b class="num">10</b><span><strong>Barra de status</strong>: arquivos selecionados, tamanho, linhas e registros exibidos. <a href="#status">Ver barra de status</a></span></li>
@@ -410,7 +418,21 @@
           <li><strong>Remover tudo</strong>: clique em <strong>Limpar filtros</strong>, à direita dos chips.</li>
           <li><kbd>Esc</kbd> limpa o texto que ainda está na caixa de busca.</li>
         </ul>
-        <p>A busca <strong>não diferencia maiúsculas de minúsculas</strong> e procura na mensagem, na data, no nível, no nome do arquivo e na stack trace.</p>
+        <p>Por padrão, a busca <strong>não diferencia maiúsculas de minúsculas</strong> e procura na mensagem, na data, no nível, no nome do arquivo e na stack trace.</p>
+        <h3>Maiúsculas e expressões regulares</h3>
+        <p>Os dois botões ao lado da caixa de busca valem para o <strong>próximo termo</strong> que você incluir ou excluir:</p>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Botão</th><th>Efeito</th></tr>
+            <tr><td><strong>Aa</strong></td><td>Diferencia maiúsculas de minúsculas: <code>POST</code> não encontra “post”.</td></tr>
+            <tr><td><strong>.*</strong></td><td>Trata o texto como <strong>expressão regular</strong>. Exemplos: <code>order=ORD-482\d+</code>, <code>timeout|refused</code>, <code>^Falha</code>.</td></tr>
+          </table>
+        </div>
+        <figure>
+          <a href="manual/21-maiusculas-regex.webp" target="_blank" rel="noopener"><img src="manual/21-maiusculas-regex.webp" width="1739" height="528" loading="lazy" alt="Um termo em expressão regular e outro diferenciando maiúsculas, ligados por OU" /></a>
+          <figcaption>Os chips mostram <code>.*</code> (expressão regular) e <code>Aa</code> (maiúsculas) antes do texto.</figcaption>
+        </figure>
+        <p>Se a expressão regular for inválida, a caixa fica vermelha e os botões Incluir/Excluir ficam desativados até você corrigir; passe o mouse sobre a caixa para ver o motivo.</p>
       </section>
 
       <!-- 11 -->
@@ -443,9 +465,24 @@
 
       <!-- 12 -->
       <section id="nivel-limite">
-        <h2 class="s"><span class="n">12</span>Nível e limite de registros</h2>
+        <h2 class="s"><span class="n">12</span>Nível, período e limite de registros</h2>
         <h3>Filtrar por nível</h3>
         <p>Os botões <strong>Todos · ERR · WRN · INF · DBG · Outros</strong> mostram somente os registros daquele nível. O número ao lado é quantos registros de cada nível existem nos arquivos selecionados.</p>
+        <h3>Filtrar por período</h3>
+        <p>O botão <strong>Período</strong>, ao lado do limite, mostra só os registros com data e hora dentro de um intervalo:</p>
+        <ul>
+          <li><strong>Atalhos</strong>: 15 min, 1 hora, 6 horas, 24 horas ou 7 dias. Eles contam a partir do <strong>registro mais recente do log</strong>, então funcionam também em logs antigos.</li>
+          <li><strong>De</strong> e <strong>Até</strong>: escolha a data e a hora exatas de início e de fim (pode preencher só um dos dois).</li>
+        </ul>
+        <figure class="mid">
+          <a href="manual/22-periodo.webp" target="_blank" rel="noopener"><img src="manual/22-periodo.webp" width="888" height="576" loading="lazy" alt="Janela de período com os atalhos e os campos De e Até" /></a>
+          <figcaption>“15 min” preenche o campo De com 15 minutos antes do último registro.</figcaption>
+        </figure>
+        <figure>
+          <a href="manual/23-periodo-aplicado.webp" target="_blank" rel="noopener"><img src="manual/23-periodo-aplicado.webp" width="1739" height="480" loading="lazy" alt="Chip de período ativo acima dos registros filtrados" /></a>
+          <figcaption>O período ativo aparece como chip; clique nele para removê-lo.</figcaption>
+        </figure>
+        <p>Enquanto o período estiver ativo, registros sem data (cabeçalhos, arquivos em formato não reconhecido) ficam ocultos.</p>
         <h3>Limitar a quantidade</h3>
         <p>O seletor <strong>Todos os registros</strong> limita a quantidade exibida a 50, 100, 500, 1.000, 5.000 ou um número <strong>Personalizado…</strong> (até 500.000). Ao escolher um limite, aparecem as opções:</p>
         <ul>
@@ -456,7 +493,7 @@
           <a href="manual/11-nivel-e-limite.webp" target="_blank" rel="noopener"><img src="manual/11-nivel-e-limite.webp" width="2200" height="606" loading="lazy" alt="Nível ERR selecionado e limite de 100 últimos registros" /></a>
           <figcaption>Nível ERR e “Últimos 100 registros”: os dois aparecem como chips e podem ser removidos pelo ×.</figcaption>
         </figure>
-        <p>Um registro conta como um só, mesmo que tenha várias linhas de stack trace. Nível, limite e busca valem juntos e ficam guardados em cada aba.</p>
+        <p>Um registro conta como um só, mesmo que tenha várias linhas de stack trace. Nível, período, limite e busca valem juntos e ficam guardados em cada aba.</p>
       </section>
 
       <!-- 13 -->
@@ -526,20 +563,25 @@
 
       <!-- 16 -->
       <section id="tempo-real">
-        <h2 class="s"><span class="n">16</span>Tempo real, recarregar e copiar</h2>
+        <h2 class="s"><span class="n">16</span>Tempo real, copiar e exportar</h2>
         <figure>
-          <a href="manual/16-ferramentas.webp" target="_blank" rel="noopener"><img src="manual/16-ferramentas.webp" width="1442" height="104" loading="lazy" alt="Barra de ferramentas" /></a>
-          <figcaption>Ferramentas: Filtros salvos, Marcadores, Quebrar linhas, Tempo real, Auto-rolar, Recarregar e Copiar.</figcaption>
+          <a href="manual/16-ferramentas.webp" target="_blank" rel="noopener"><img src="manual/16-ferramentas.webp" width="1739" height="62" loading="lazy" alt="Barra de ferramentas" /></a>
+          <figcaption>Níveis e ferramentas: Filtros salvos, Marcadores, Quebrar linhas, Tempo real, Auto-rolar, Recarregar, Copiar e Exportar.</figcaption>
         </figure>
         <div class="table-wrap">
           <table>
             <tr><th>Botão</th><th>O que faz</th></tr>
-            <tr><td><strong>Tempo real</strong></td><td>Com a bolinha verde piscando, o OctoSearch confere os arquivos selecionados a cada 1,5 segundo e recarrega sozinho quando eles mudam no disco. Ideal para acompanhar um serviço rodando.</td></tr>
+            <tr><td><strong>Tempo real</strong></td><td>Com a bolinha verde piscando, o OctoSearch é avisado pelo sistema quando os arquivos selecionados mudam (e ainda confere a cada poucos segundos, para pastas de rede). Ele lê <strong>só as linhas novas</strong>, então acompanha até arquivos enormes sem travar. Se o arquivo for rotacionado ou truncado, ele é relido por inteiro.</td></tr>
             <tr><td><strong>Auto-rolar</strong></td><td>Aparece com o tempo real ligado. Ativo, a tela acompanha a última linha conforme o log cresce; pausado, mantém sua posição para você ler com calma.</td></tr>
             <tr><td><strong>Recarregar</strong> (setas circulares)</td><td>Lê os arquivos selecionados de novo, na hora.</td></tr>
             <tr><td><strong>Copiar</strong></td><td>Copia para a área de transferência todos os registros que estão visíveis, já com busca e filtros aplicados. Ótimo para colar num chamado ou num e-mail.</td></tr>
+            <tr><td><strong>Exportar</strong></td><td>Salva os registros visíveis num arquivo: <strong>Texto (.log)</strong>, igual ao original, ou <strong>Planilha (.csv)</strong>, com colunas de arquivo, linha, data/hora, nível, mensagem e stack trace, pronta para abrir no Excel.</td></tr>
           </table>
         </div>
+        <figure class="mid">
+          <a href="manual/24-exportar.webp" target="_blank" rel="noopener"><img src="manual/24-exportar.webp" width="773" height="309" loading="lazy" alt="Menu Exportar com as opções Texto e Planilha" /></a>
+          <figcaption>O menu mostra quantos registros serão exportados.</figcaption>
+        </figure>
       </section>
 
       <!-- 17 -->
@@ -616,6 +658,13 @@
             <tr><td>Outras datas</td><td><code>08/10/2026 14:05:58</code>, <code>2026/10/08 …</code>, só a hora <code>14:05:58</code></td></tr>
           </table>
         </div>
+        <h3>Arquivos compactados e codificação</h3>
+        <ul>
+          <li>Rotações compactadas com gzip (<code>app.log.1.gz</code>) aparecem na lista e são descompactadas na hora de abrir.</li>
+          <li>A codificação é detectada sozinha: <strong>UTF-8</strong> (com ou sem BOM), <strong>UTF-16</strong> (“Unicode” no .NET) e <strong>Windows-1252</strong> (o padrão ANSI de serviços .NET Framework antigos). Os acentos aparecem corretamente nos três casos.</li>
+        </ul>
+        <h3>Arquivos muito grandes</h3>
+        <p>Arquivos com mais de <strong>200 MB</strong> são abertos pelo final: o OctoSearch carrega os últimos 200 MB (os registros mais recentes) e mostra um aviso azul. Os números de linha passam a contar a partir do trecho carregado. O processamento acontece em segundo plano, então a janela continua respondendo enquanto o arquivo é lido.</p>
         <h3>Formato não reconhecido</h3>
         <p>Se nenhuma linha de um arquivo seguir um formato conhecido, o OctoSearch avisa e mostra o arquivo <strong>linha a linha</strong>, sem data e nível. A busca, os marcadores e a cópia continuam funcionando normalmente.</p>
         <figure>
@@ -630,7 +679,9 @@
         <h3>O Windows bloqueou a instalação</h3>
         <p>Clique em <strong>Mais informações</strong> → <strong>Executar assim mesmo</strong>. O aviso do SmartScreen aparece porque o instalador não tem assinatura digital; ele não indica vírus.</p>
         <h3>Abri uma pasta e nenhum arquivo apareceu</h3>
-        <p>Só são listados arquivos <code>.log</code>, <code>.txt</code> e rotacionados (<code>.log.1</code>, <code>.txt.2</code>…). Confira a extensão dos seus logs e se você tem permissão de leitura na pasta.</p>
+        <p>Só são listados arquivos <code>.log</code>, <code>.txt</code>, rotacionados (<code>.log.1</code>, <code>.txt.2</code>…) e compactados (<code>.log.1.gz</code>). Confira a extensão dos seus logs e se você tem permissão de leitura na pasta.</p>
+        <h3>O OctoSearch pediu permissão para ler uma pasta</h3>
+        <p>Por segurança, o aplicativo só lê logs dentro de pastas que você escolheu em <strong>Abrir pasta</strong> ou autorizou. Ao abrir uma pasta salva ou digitada pela primeira vez, ele pergunta <em>“Permitir que o OctoSearch leia os logs desta pasta?”</em>. Clique em <strong>Permitir</strong>: a autorização fica guardada para as próximas vezes. As pastas que você já usava antes da versão 1.1.0 continuam liberadas.</p>
         <h3>Faltam arquivos em pastas muito grandes</h3>
         <p>Para não travar em pastas enormes ou de rede, o OctoSearch lista até <strong>5.000 arquivos</strong> e desce até <strong>12 níveis</strong> de subpastas. Abra uma subpasta mais específica.</p>
         <h3>A busca não encontra um texto que eu sei que existe</h3>
@@ -643,10 +694,12 @@
         <p>Ligue o <strong>Tempo real</strong> (bolinha verde) ou clique em <strong>Recarregar</strong>.</p>
         <h3>A tela pula para o final sozinha</h3>
         <p>É o <strong>Auto-rolar</strong>, que acompanha as linhas novas. Clique nele para pausar.</p>
+        <h3>O AppImage não abre no Linux</h3>
+        <p>Confira se o arquivo tem permissão de execução (<code>chmod +x OctoSearch-x86_64.AppImage</code>) e se o pacote <code>libfuse2</code> está instalado. Se preferir, use o <code>.deb</code>, que não depende de FUSE.</p>
         <h3>Onde ficam minhas pastas, filtros e marcadores?</h3>
-        <p>No seu próprio computador, no perfil do Windows. Eles são mantidos nas atualizações do aplicativo e não são enviados para nenhum servidor.</p>
+        <p>No seu próprio computador, no perfil do usuário. Eles são mantidos nas atualizações do aplicativo e não são enviados para nenhum servidor.</p>
         <h3>Como recebo versões novas?</h3>
-        <p>Na versão instalada, automaticamente (<a href="#instalacao">veja Instalação e atualização</a>). Na versão portátil, baixe de novo pelo <a href="index.html#download">site</a>.</p>
+        <p>No instalador do Windows e no AppImage, automaticamente (<a href="#instalacao">veja Instalação e atualização</a>). No portátil e no .deb, baixe de novo pelo <a href="index.html#download">site</a>.</p>
       </section>
     </main>
   </div>

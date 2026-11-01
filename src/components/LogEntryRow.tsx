@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
-import { LogEntry, EntryLogLevel, HighlightRule } from '../types';
-import { splitTextWithHighlights } from '../services/logSearch';
+import { LogEntry, EntryLogLevel, HighlightRule, SearchPattern } from '../types';
+import { createAnyPatternMatcher, splitTextWithHighlights } from '../services/logSearch';
 import { highlightColorWithAlpha, normalizeHighlightColor } from '../utils/highlightColor';
 import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 
 interface LogEntryRowProps {
   entry: LogEntry;
-  searchTerms: string[];
+  searchTerms: SearchPattern[];
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   highlightRule?: HighlightRule;
@@ -53,7 +53,7 @@ function getLevelLabel(entry: LogEntry): string {
   return entry.level === 'OTHER' ? '—' : entry.level;
 }
 
-function renderHighlightedText(text: string, searchTerms: string[]) {
+function renderHighlightedText(text: string, searchTerms: SearchPattern[]) {
   if (searchTerms.length === 0) {
     return <span>{text}</span>;
   }
@@ -91,17 +91,15 @@ function getRowAppearanceClass(
   return `border-slate-100 dark:border-slate-800/80 ${defaultRowClass}`;
 }
 
-function stackContainsSearch(entry: LogEntry, searchTerms: string[]): boolean {
+function stackContainsSearch(entry: LogEntry, searchTerms: SearchPattern[]): boolean {
   if (searchTerms.length === 0 || !entry.hasStackTrace) return false;
-  return entry.stackTrace.some((line) =>
-    searchTerms.some((term) => line.toLowerCase().includes(term.toLowerCase()))
-  );
+  const matches = createAnyPatternMatcher(searchTerms);
+  return entry.stackTrace.some(matches);
 }
 
-function entryContainsAnySearchTerm(entry: LogEntry, searchTerms: string[]): boolean {
+function entryContainsAnySearchTerm(entry: LogEntry, searchTerms: SearchPattern[]): boolean {
   if (searchTerms.length === 0) return false;
-  const rawText = entry.rawText.toLowerCase();
-  return searchTerms.some((term) => rawText.includes(term.toLowerCase()));
+  return createAnyPatternMatcher(searchTerms)(entry.rawText);
 }
 
 function getHighlightStyle(highlightColor: string | null): React.CSSProperties | undefined {
@@ -115,7 +113,7 @@ function getHighlightStyle(highlightColor: string | null): React.CSSProperties |
 
 interface StackTraceDetailsProps {
   entry: LogEntry;
-  searchTerms: string[];
+  searchTerms: SearchPattern[];
   wordWrap: boolean;
 }
 
@@ -201,7 +199,7 @@ function EntryContextMenu({
 
 interface PrimaryLogLineProps {
   entry: LogEntry;
-  searchTerms: string[];
+  searchTerms: SearchPattern[];
   isExpanded: boolean;
   wordWrap: boolean;
   highlightColor: string | null;

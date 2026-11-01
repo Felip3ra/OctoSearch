@@ -128,8 +128,9 @@ jobs:
           mkdir -p "$REPORT_DIR"
           npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
           npm run lint
+          npm test
           npm run build
-        displayName: Verificar tipos e gerar interface de producao
+        displayName: Verificar tipos, testes e gerar interface de producao
         env:
           REPORT_DIR: $(Build.ArtifactStagingDirectory)/dast
       - bash: bash scripts/security/run-zap.sh

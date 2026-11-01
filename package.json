@@ -1,7 +1,7 @@
 {
   "name": "visualizador-de-logs-net",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "OctoSearch - visualizador e pesquisador de arquivos de log",
   "author": "Felipe Santos",
   "type": "module",
@@ -11,11 +11,16 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "node -e \"for (const d of ['dist','dist-exe']) require('node:fs').rmSync(d,{recursive:true,force:true})\"",
-    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit && oxlint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "desktop": "electron .",
     "build:exe": "vite build && electron-builder --win portable",
     "build:installer": "vite build && electron-builder --win nsis",
-    "release": "vite build && node scripts/ensure-release.mjs && electron-builder --win nsis --publish always && electron-builder --win portable --publish always"
+    "build:linux": "vite build && electron-builder --linux AppImage deb --publish never",
+    "release": "vite build && node scripts/ensure-release.mjs && electron-builder --win nsis --publish always && electron-builder --win portable --publish always",
+    "release:linux": "vite build && electron-builder --linux AppImage deb --publish always"
   },
   "build": {
     "appId": "com.octosearch.desktop",
@@ -55,7 +60,8 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "!electron/**/*.test.*"
     ],
     "publish": [
       {
@@ -64,7 +70,35 @@
         "repo": "OctoSearch",
         "releaseType": "release"
       }
-    ]
+    ],
+    "linux": {
+      "icon": "electron/icons",
+      "category": "Development",
+      "synopsis": "Visualizador e pesquisador de arquivos de log",
+      "description": "OctoSearch: leitura, pesquisa e análise de arquivos de log .NET (Serilog, log4net, NLog e outros).",
+      "maintainer": "Felipe Santos <Felip3ra@users.noreply.github.com>",
+      "executableName": "octosearch",
+      "artifactName": "OctoSearch-${arch}.${ext}",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "desktopName": "octosearch.desktop",
+      "syncDesktopName": true
+    },
+    "deb": {
+      "artifactName": "OctoSearch-${arch}.${ext}"
+    }
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
@@ -78,11 +112,13 @@
     "electron": "^44.4.3",
     "electron-builder": "^26.15.3",
     "lucide-react": "^0.546.0",
+    "oxlint": "^1.90.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^5.0.5"
   }
 }

@@ -4,9 +4,15 @@ export type SearchMode = 'include' | 'exclude';
 /** How two included terms combine: 'or' needs either of them, 'and' needs both. */
 export type FilterOperator = 'or' | 'and';
 
-export interface SearchFilter {
-  id: string;
+/** A text to look for; plain text ignores case unless `caseSensitive`, `regex` treats it as a regular expression. */
+export interface SearchPattern {
   text: string;
+  regex?: boolean;
+  caseSensitive?: boolean;
+}
+
+export interface SearchFilter extends SearchPattern {
+  id: string;
   mode: SearchMode;
   /**
    * How an included term joins the included term before it. AND binds tighter than OR,
@@ -61,6 +67,12 @@ export interface FolderTab {
   lineLimit?: string;
   customLineLimit?: number;
   lineLimitDirection?: 'tail' | 'head';
+  /** Options applied to the next term typed in the search box. */
+  searchRegex?: boolean;
+  searchCaseSensitive?: boolean;
+  /** Only records dated inside this range (epoch ms, both ends inclusive) are shown. */
+  timeFrom?: number;
+  timeTo?: number;
 }
 
 export interface ParseProgress {
@@ -111,12 +123,29 @@ export interface ElectronFolderResult {
   }[];
 }
 
+export interface FileReadResult {
+  bytes: Uint8Array;
+  /** Byte offset where the read started (greater than zero when a large file is opened by its end). */
+  start: number;
+  /** Byte offset where the read ended; the next live read continues from here. */
+  size: number;
+  mtimeMs: number;
+}
+
+type NativeLogFile = { name: string; path: string; relativePath?: string; size: number; createdAt?: number; lastModified: number };
+
 export interface ElectronAPI {
   isElectron: boolean;
+  platform?: string;
   selectFolder: () => Promise<ElectronFolderResult | null>;
-  readFolder: (folderPath: string) => Promise<{ name: string; path: string; relativePath?: string; size: number; createdAt?: number; lastModified: number }[]>;
-  readFile: (filePath: string) => Promise<string>;
+  importKnownFolders?: (folderPaths: string[]) => Promise<boolean>;
+  readFolder: (folderPath: string) => Promise<NativeLogFile[]>;
+  readFile: (filePath: string) => Promise<FileReadResult>;
+  readFileFrom?: (filePath: string, offset: number) => Promise<FileReadResult | null>;
   checkFileStats?: (filePath: string) => Promise<{ size: number; mtimeMs: number } | null>;
+  watchFiles?: (filePaths: string[]) => Promise<string[]>;
+  onFileChanged?: (callback: (filePath: string) => void) => () => void;
+  saveTextFile?: (options: { defaultName: string; content: string }) => Promise<string | null>;
   openInExplorer?: (targetPath: string) => Promise<void>;
 }
 

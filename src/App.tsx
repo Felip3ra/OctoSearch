@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   LogFileItem,
-  LogEntry,
   LogLevel,
   FolderTab,
   SavedFolder,
@@ -12,9 +11,11 @@ import {
   FileSortField,
   SortDirection,
 } from './types';
-import { parseLogContentAsync } from './services/logParser';
-import { filterLogEntries, getIncludeBlocks } from './services/logSearch';
-import { getSourceColor, mergeLogSources } from './services/logMerge';
+import { filterLogEntries, getIncludeBlocks, getPatternError } from './services/logSearch';
+import { getSourceColor } from './services/logMerge';
+import { buildExport, ExportFormat, exportFileName, saveExport } from './services/logExport';
+import { useLogLoader, MAX_INITIAL_READ_BYTES } from './hooks/useLogLoader';
+import { booleanCodec, enumCodec, PersistedStateCodec, usePersistedState } from './hooks/usePersistedState';
 import { sortFilesByName } from './utils/fileSorter';
 import {
   buildSourceLabels,
@@ -40,6 +41,8 @@ import { SavedFoldersModal } from './components/SavedFoldersModal';
 import { HighlightRulesModal } from './components/HighlightRulesModal';
 import { SettingsModal } from './components/SettingsModal';
 import { SavedFiltersModal } from './components/SavedFiltersModal';
+import { TimeRangeFilter, describeTimeRange } from './components/TimeRangeFilter';
+import { ExportMenu } from './components/ExportMenu';
 import { cloneFilterTerms, getSavedFilters, persistSavedFilters } from './services/filterStorage';
 import {
   Search,
@@ -48,8 +51,10 @@ import {
   RefreshCw,
   Copy,
   Check,
-  Radio,
   ArrowDown,
+  Regex,
+  CaseSensitive,
+  Info,
   Highlighter,
   Minus,
   Plus,
@@ -105,33 +110,10 @@ function remapSelection(previous: FolderTab, files: LogFileItem[]): string[] {
   return remapped.length > 0 ? remapped : getDefaultSelection(files);
 }
 
-async function readLogFileContent(file: LogFileItem): Promise<string> {
-  if (file.content) return file.content;
-  if (window.electronAPI?.readFile && isNativeFile(file)) return window.electronAPI.readFile(file.path);
-  if (file.file) return file.file.text();
-  throw new Error(`Conteúdo do arquivo "${file.name}" não disponível.`);
-}
-
-interface ParsedFile {
-  entries: LogEntry[];
-  totalLines: number;
-  formatRecognized: boolean;
-  size: number;
-  mtime: number;
-}
-
-async function parseFile(
-  content: string,
-  referenceTime: number,
-  onProgress?: (progress: number) => void
-): Promise<Pick<ParsedFile, 'entries' | 'totalLines' | 'formatRecognized'>> {
-  if (!content.trim()) return { entries: [], totalLines: 0, formatRecognized: true };
-  return parseLogContentAsync(content, onProgress, { referenceTime });
-}
-
 const HIGHLIGHT_RULES_STORAGE_KEY = 'log-viewer-highlight-rules-v1';
 const OPEN_TABS_STORAGE_KEY = 'log-viewer-open-tabs-v1';
 const MAX_CUSTOM_LINE_LIMIT = 500000;
+const NO_SEARCH_FILTERS: SearchFilter[] = [];
 
 interface PersistedTab {
   path: string;
@@ -162,28 +144,37 @@ function loadPersistedSession(): PersistedSession | null {
   }
 }
 
-function loadHighlightRules(): HighlightRule[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(HIGHLIGHT_RULES_STORAGE_KEY) || '[]');
-    if (!Array.isArray(parsed)) return [];
+const highlightRulesCodec: PersistedStateCodec<HighlightRule[]> = {
+  parse: (raw) => {
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return undefined;
+      return parsed.flatMap((rule): HighlightRule[] => {
+        const color = normalizeHighlightColor(rule?.color);
+        if (
+          typeof rule?.id !== 'string' ||
+          typeof rule?.text !== 'string' ||
+          !color ||
+          typeof rule?.caseSensitive !== 'boolean' ||
+          typeof rule?.enabled !== 'boolean'
+        ) {
+          return [];
+        }
+        return [{ ...rule, color }];
+      });
+    } catch {
+      return undefined;
+    }
+  },
+  serialize: (rules) => JSON.stringify(rules),
+};
 
-    return parsed.flatMap((rule): HighlightRule[] => {
-      const color = normalizeHighlightColor(rule?.color);
-      if (
-        typeof rule?.id !== 'string' ||
-        typeof rule?.text !== 'string' ||
-        !color ||
-        typeof rule?.caseSensitive !== 'boolean' ||
-        typeof rule?.enabled !== 'boolean'
-      ) {
-        return [];
-      }
-      return [{ ...rule, color }];
-    });
-  } catch {
-    return [];
-  }
-}
+const themeCodec: PersistedStateCodec<boolean> = {
+  parse: (raw) => (raw === 'dark' ? true : raw === 'light' ? false : undefined),
+  serialize: (isDark) => (isDark ? 'dark' : 'light'),
+};
+const fileSortFieldCodec = enumCodec<FileSortField>(['name', 'createdAt', 'lastModified']);
+const sortDirectionCodec = enumCodec<SortDirection>(['asc', 'desc']);
 
 const LEVEL_OPTIONS: { value: LogLevel; label: string; dot?: string }[] = [
   { value: 'ALL', label: 'Todos' },
@@ -201,18 +192,15 @@ const neutralButtonClass =
 const activeButtonClass = 'bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300';
 
 export default function App() {
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() =>
-    document.documentElement.classList.contains('dark')
+  const [isDarkMode, setIsDarkMode] = usePersistedState(
+    'log-viewer-theme',
+    () => document.documentElement.classList.contains('dark'),
+    themeCodec
   );
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
     document.documentElement.style.colorScheme = isDarkMode ? 'dark' : 'light';
-    try {
-      localStorage.setItem('log-viewer-theme', isDarkMode ? 'dark' : 'light');
-    } catch {
-      // Keep theme switching functional when browser storage is unavailable.
-    }
   }, [isDarkMode]);
 
   // Tabs State (each tab represents an open folder)
@@ -245,16 +233,6 @@ export default function App() {
     return { labels, colorById, colorByLabel };
   }, [selectedFiles]);
 
-  // Log entries state
-  const [entries, setEntries] = useState<LogEntry[]>([]);
-  const [totalOriginalLines, setTotalOriginalLines] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [loadingProgress, setLoadingProgress] = useState<number>(0);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [unrecognizedFiles, setUnrecognizedFiles] = useState<string[]>([]);
-  const parsedFilesRef = useRef(new Map<string, ParsedFile>());
-  const loadRequestRef = useRef(0);
-
   const [copiedAll, setCopiedAll] = useState<boolean>(false);
   const [isDesktopModalOpen, setIsDesktopModalOpen] = useState<boolean>(false);
 
@@ -271,186 +249,49 @@ export default function App() {
     setSavedFilters(next);
     persistSavedFilters(next);
   };
-  const [highlightRules, setHighlightRules] = useState<HighlightRule[]>(loadHighlightRules);
+  const [highlightRules, setHighlightRules] = usePersistedState<HighlightRule[]>(
+    HIGHLIGHT_RULES_STORAGE_KEY,
+    [],
+    highlightRulesCodec
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [wordWrap, setWordWrap] = useState(() => {
-    try {
-      return localStorage.getItem('log-viewer-word-wrap') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [fileSortField, setFileSortField] = useState<FileSortField>(() => {
-    try {
-      const saved = localStorage.getItem('log-viewer-file-sort-field');
-      return saved === 'createdAt' || saved === 'lastModified' ? saved : 'name';
-    } catch {
-      return 'name';
-    }
-  });
-  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
-    try {
-      return localStorage.getItem('log-viewer-file-sort-direction') === 'desc' ? 'desc' : 'asc';
-    } catch {
-      return 'asc';
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(HIGHLIGHT_RULES_STORAGE_KEY, JSON.stringify(highlightRules));
-    } catch {
-      // Highlighting remains available for the current session.
-    }
-  }, [highlightRules]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('log-viewer-word-wrap', String(wordWrap));
-    } catch {
-      // Keep the preference active for the current session.
-    }
-  }, [wordWrap]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('log-viewer-file-sort-field', fileSortField);
-      localStorage.setItem('log-viewer-file-sort-direction', sortDirection);
-    } catch {
-      // Keep sorting active for the current session.
-    }
-  }, [fileSortField, sortDirection]);
+  const [wordWrap, setWordWrap] = usePersistedState('log-viewer-word-wrap', false, booleanCodec);
+  const [fileSortField, setFileSortField] = usePersistedState<FileSortField>(
+    'log-viewer-file-sort-field',
+    'name',
+    fileSortFieldCodec
+  );
+  const [sortDirection, setSortDirection] = usePersistedState<SortDirection>(
+    'log-viewer-file-sort-direction',
+    'asc',
+    sortDirectionCodec
+  );
 
   // Live tailing / Real-time auto-follow state
   const [isLiveTailing, setIsLiveTailing] = useState<boolean>(true);
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
-  const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
   const canWatchFiles = Boolean(window.electronAPI?.checkFileStats) && selectedFiles.some(isNativeFile);
 
   // Drag and drop overlay state
   const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false);
 
-  /** Rebuilds the visible timeline from the per-file parse cache. */
-  const applyParsedFiles = useCallback(
-    (files: LogFileItem[], parsed: Map<string, ParsedFile>) => {
-      const labels = buildSourceLabels(files);
-      const sources = files.flatMap((file) => {
-        const result = parsed.get(file.id);
-        return result ? [{ label: labels.get(file.id) || file.name, entries: result.entries }] : [];
-      });
-      setEntries(mergeLogSources(sources));
-      setTotalOriginalLines(files.reduce((total, file) => total + (parsed.get(file.id)?.totalLines || 0), 0));
-      setUnrecognizedFiles(files.filter((file) => parsed.get(file.id)?.formatRecognized === false).map((file) => file.name));
-    },
-    []
-  );
-
-  const loadSelection = useCallback(
-    async (files: LogFileItem[]) => {
-      const requestId = ++loadRequestRef.current;
-      const isCurrent = () => requestId === loadRequestRef.current;
-      setIsLoading(true);
-      setLoadingProgress(0);
-      setErrorMessage(null);
-
-      const parsed = new Map<string, ParsedFile>();
-      const failures: string[] = [];
-      try {
-        for (let index = 0; index < files.length; index++) {
-          const file = files[index];
-          const progressBase = (index / files.length) * 100;
-          const progressSpan = 100 / files.length;
-          try {
-            const content = await readLogFileContent(file);
-            if (!isCurrent()) return;
-            const result = await parseFile(content, file.lastModified, (progress) => {
-              if (isCurrent()) setLoadingProgress(Math.round(progressBase + (progress * progressSpan) / 100));
-            });
-            if (!isCurrent()) return;
-            parsed.set(file.id, { ...result, size: file.size, mtime: file.lastModified });
-          } catch (err: unknown) {
-            console.error(err);
-            failures.push(`${file.name}: ${(err as Error)?.message || 'erro desconhecido'}`);
-            // Unknown stats make live polling retry this file instead of blocking the whole selection.
-            parsed.set(file.id, { entries: [], totalLines: 0, formatRecognized: true, size: -1, mtime: -1 });
-          }
-          setLoadingProgress(Math.round(progressBase + progressSpan));
-        }
-
-        parsedFilesRef.current = parsed;
-        applyParsedFiles(files, parsed);
-        if (failures.length > 0) {
-          setErrorMessage(
-            failures.length === files.length && files.length === 1
-              ? failures[0]
-              : `Não foi possível ler ${failures.length} de ${files.length} arquivo(s): ${failures.join(' | ')}`
-          );
-        }
-      } finally {
-        if (isCurrent()) setIsLoading(false);
-      }
-    },
-    [applyParsedFiles]
-  );
-
-  // Load whenever the selection changes
-  useEffect(() => {
-    if (selectedFiles.length === 0) {
-      loadRequestRef.current++;
-      parsedFilesRef.current = new Map();
-      setEntries([]);
-      setTotalOriginalLines(0);
-      setErrorMessage(null);
-      setUnrecognizedFiles([]);
-      setIsLoading(false);
-      return;
-    }
-    void loadSelection(selectedFiles);
-  }, [selectedFiles, loadSelection]);
-
-  // Live polling (Electron): watches every selected file and re-merges only when one changes.
-  useEffect(() => {
-    const checkFileStats = window.electronAPI?.checkFileStats;
-    const watchedFiles = selectedFiles.filter(isNativeFile);
-    if (!isLiveTailing || !checkFileStats || watchedFiles.length === 0) return;
-
-    let isPolling = false;
-    let disposed = false;
-
-    const intervalId = setInterval(async () => {
-      const parsed = parsedFilesRef.current;
-      if (isPolling || !selectedFiles.every((file) => parsed.has(file.id))) return;
-      isPolling = true;
-      try {
-        let changed = false;
-        for (const file of watchedFiles) {
-          const current = parsed.get(file.id);
-          const stats = await checkFileStats(file.path);
-          if (disposed) return;
-          if (!current || !stats || (stats.size === current.size && stats.mtimeMs === current.mtime)) continue;
-
-          const content = await window.electronAPI!.readFile(file.path);
-          const result = await parseFile(content, stats.mtimeMs);
-          if (disposed) return;
-          parsed.set(file.id, { ...result, size: stats.size, mtime: stats.mtimeMs });
-          changed = true;
-        }
-        if (changed && parsed === parsedFilesRef.current) {
-          applyParsedFiles(selectedFiles, parsed);
-          setLastLiveUpdate(new Date());
-        }
-      } catch (err) {
-        console.error('Erro ao verificar atualização dos arquivos em tempo real:', err);
-      } finally {
-        isPolling = false;
-      }
-    }, 1500);
-
-    return () => {
-      disposed = true;
-      clearInterval(intervalId);
-    };
-  }, [isLiveTailing, selectedFiles, applyParsedFiles]);
+  // Reading, parsing (in a Web Worker) and live updates of the selected files
+  const {
+    entries,
+    totalLines: totalOriginalLines,
+    isLoading,
+    setIsLoading,
+    loadingProgress,
+    setLoadingProgress,
+    errorMessage,
+    setErrorMessage,
+    unrecognizedFiles,
+    dismissUnrecognized,
+    truncatedFiles,
+    dismissTruncated,
+    lastLiveUpdate,
+    reload,
+  } = useLogLoader(selectedFiles, isLiveTailing);
 
   const updateActiveTab = useCallback(
     (updater: (tab: FolderTab) => FolderTab) => {
@@ -562,12 +403,19 @@ export default function App() {
           .filter((folder) => folder.isFavorite)
           .map((folder) => ({ path: folder.path, name: folder.name, selectedPaths: [] }));
 
+    // Folders saved before the desktop app started asking for folder access keep working without a prompt
+    // (the main process accepts this list only once, on the first run of this version).
+    const knownFolders = [...savedFolders.map((folder) => folder.path), ...(session?.tabs.map((tab) => tab.path) ?? [])];
+    const importKnown = window.electronAPI.importKnownFolders?.(knownFolders).catch(() => false) ?? Promise.resolve(false);
+
     if (toRestore.length === 0) {
       isSessionRestored.current = true;
+      void importKnown;
       return;
     }
 
     const restore = async () => {
+      await importKnown;
       setIsLoading(true);
       setLoadingProgress(0);
       const restoredTabs: FolderTab[] = [];
@@ -611,7 +459,7 @@ export default function App() {
     };
 
     void restore();
-  }, [savedFolders]);
+  }, [savedFolders, setIsLoading, setLoadingProgress]);
 
   // Persist which native folders are open (and their selection) for the next session.
   useEffect(() => {
@@ -664,26 +512,42 @@ export default function App() {
   // Search, level and line count (stored per-tab)
   const searchTerm = activeTab?.searchTerm || '';
   const searchMode = activeTab?.searchMode || 'include';
-  const searchFilters = activeTab?.searchFilters || [];
+  const searchFilters = activeTab?.searchFilters || NO_SEARCH_FILTERS;
   const includeOperator = activeTab?.includeOperator || 'or';
   const includedSearchTerms = useMemo(
-    () => searchFilters.filter((filter) => filter.mode === 'include').map((filter) => filter.text),
+    () => searchFilters.filter((filter) => filter.mode === 'include'),
     [searchFilters]
   );
   const levelFilter = activeTab?.levelFilter || 'ALL';
   const lineLimit = activeTab?.lineLimit || 'ALL';
   const customLineLimit = activeTab?.customLineLimit || 100;
   const lineLimitDirection = activeTab?.lineLimitDirection || 'tail';
+  const searchRegex = Boolean(activeTab?.searchRegex);
+  const searchCaseSensitive = Boolean(activeTab?.searchCaseSensitive);
+  const timeFrom = activeTab?.timeFrom;
+  const timeTo = activeTab?.timeTo;
+  const hasTimeRange = timeFrom !== undefined || timeTo !== undefined;
+  const searchPatternError = searchTerm.trim() ? getPatternError({ text: searchTerm.trim(), regex: searchRegex }) : null;
 
   const setSearchTerm = (term: string) => updateActiveTab((tab) => ({ ...tab, searchTerm: term }));
+  const toggleSearchRegex = () => updateActiveTab((tab) => ({ ...tab, searchRegex: !tab.searchRegex }));
+  const toggleSearchCaseSensitive = () =>
+    updateActiveTab((tab) => ({ ...tab, searchCaseSensitive: !tab.searchCaseSensitive }));
+  const setTimeRange = (from: number | undefined, to: number | undefined) =>
+    updateActiveTab((tab) => ({ ...tab, timeFrom: from, timeTo: to }));
 
   const addSearchFilter = (mode: SearchMode) => {
     const normalizedText = searchTerm.trim();
-    if (!normalizedText) return;
+    if (!normalizedText || searchPatternError) return;
     const key = normalizedText.toLocaleLowerCase('pt-BR');
 
     updateActiveTab((tab) => {
-      const sameText = (filter: SearchFilter) => filter.text.toLocaleLowerCase('pt-BR') === key;
+      const regex = Boolean(tab.searchRegex);
+      const caseSensitive = Boolean(tab.searchCaseSensitive);
+      const sameText = (filter: SearchFilter) =>
+        Boolean(filter.regex) === regex &&
+        Boolean(filter.caseSensitive) === caseSensitive &&
+        (caseSensitive || regex ? filter.text === normalizedText : filter.text.toLocaleLowerCase('pt-BR') === key);
       const currentFilters = tab.searchFilters || [];
       if (currentFilters.some((filter) => filter.mode === mode && sameText(filter))) {
         return { ...tab, searchTerm: '', searchMode: mode };
@@ -694,6 +558,8 @@ export default function App() {
         id: `search-filter-${Date.now()}-${crypto.randomUUID()}`,
         text: normalizedText,
         mode,
+        ...(regex ? { regex } : {}),
+        ...(caseSensitive ? { caseSensitive } : {}),
       };
       return { ...tab, searchTerm: '', searchMode: mode, searchFilters: [...withoutOpposite, newFilter] };
     });
@@ -775,6 +641,8 @@ export default function App() {
         }`}
       >
         {filter.mode === 'exclude' ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+        {filter.regex && <span className="rounded bg-current/10 px-0.5 font-mono text-[9px] font-bold opacity-70" title="Expressão regular">.*</span>}
+        {filter.caseSensitive && <span className="rounded bg-current/10 px-0.5 font-mono text-[9px] font-bold opacity-70" title="Diferencia maiúsculas e minúsculas">Aa</span>}
         <span className="font-mono">{filter.text}</span>
       </button>
       <button
@@ -789,7 +657,6 @@ export default function App() {
     </span>
   );
 
-  const clearSearchFilters = () => updateActiveTab((tab) => ({ ...tab, searchTerm: '', searchFilters: [] }));
   const setLevelFilter = (level: LogLevel) => updateActiveTab((tab) => ({ ...tab, levelFilter: level }));
   const setLineLimit = (limit: string) => updateActiveTab((tab) => ({ ...tab, lineLimit: limit }));
   const setCustomLineLimit = (count: number) =>
@@ -807,8 +674,18 @@ export default function App() {
       lineLimit,
       customLineLimit,
       lineLimitDirection,
+      timeFrom,
+      timeTo,
     });
-  }, [entries, searchMode, searchFilters, includeOperator, levelFilter, lineLimit, customLineLimit, lineLimitDirection]);
+  }, [entries, searchMode, searchFilters, includeOperator, levelFilter, lineLimit, customLineLimit, lineLimitDirection, timeFrom, timeTo]);
+
+  const latestEntryTime = useMemo(() => {
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const time = entries[index].time;
+      if (time !== undefined) return time;
+    }
+    return undefined;
+  }, [entries]);
 
   const levelCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: entries.length, INF: 0, WRN: 0, ERR: 0, DBG: 0, OTHER: 0 };
@@ -827,6 +704,8 @@ export default function App() {
       includeOperator: 'or',
       levelFilter: 'ALL',
       lineLimit: 'ALL',
+      timeFrom: undefined,
+      timeTo: undefined,
     }));
   }, [updateActiveTab]);
 
@@ -878,7 +757,7 @@ export default function App() {
     const validFiles = droppedFiles.filter((f) => isSupportedLogFileName(f.name));
 
     if (validFiles.length === 0) {
-      alert('Por favor, solte arquivos .log, .txt ou logs rotacionados como .log.1.');
+      alert('Por favor, solte arquivos .log, .txt, logs rotacionados como .log.1 ou compactados como .log.gz.');
       return;
     }
 
@@ -910,10 +789,7 @@ export default function App() {
   const handleCopyVisible = async () => {
     if (filteredEntries.length === 0) return;
     try {
-      const textToCopy = filteredEntries
-        .map((entry) => (isMergedView && entry.sourceFile ? `[${entry.sourceFile}] ${entry.rawText}` : entry.rawText))
-        .join('\n');
-      await navigator.clipboard.writeText(textToCopy);
+      await navigator.clipboard.writeText(buildExport(filteredEntries, 'log', isMergedView));
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2000);
     } catch {
@@ -921,12 +797,13 @@ export default function App() {
     }
   };
 
-  const handleReload = () => {
-    if (selectedFiles.length > 0) void loadSelection(selectedFiles);
+  const handleExport = (format: ExportFormat) => {
+    const baseName = isMergedView ? activeTab?.folderName || 'logs' : selectedFiles[0]?.name || 'logs';
+    return saveExport(exportFileName(baseName, format), buildExport(filteredEntries, format, isMergedView));
   };
 
   const hasActiveFilters =
-    searchFilters.length > 0 || levelFilter !== 'ALL' || lineLimit !== 'ALL';
+    searchFilters.length > 0 || levelFilter !== 'ALL' || lineLimit !== 'ALL' || hasTimeRange;
   const enabledHighlightRules = highlightRules.filter((rule) => rule.enabled);
   const limitCountLabel = lineLimit === 'custom' ? customLineLimit : lineLimit;
   const limitDirectionLabel = lineLimitDirection === 'tail' ? 'Últimos' : 'Primeiros';
@@ -1025,8 +902,10 @@ export default function App() {
                       }
                     }}
                     disabled={!activeTab}
-                    placeholder="Buscar nos logs…  Enter inclui · Shift+Enter exclui"
-                    className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-8 font-mono text-xs text-slate-900 placeholder:font-sans placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:bg-slate-950"
+                    placeholder={searchRegex ? 'Expressão regular…  Enter inclui · Shift+Enter exclui' : 'Buscar nos logs…  Enter inclui · Shift+Enter exclui'}
+                    aria-invalid={Boolean(searchPatternError)}
+                    title={searchPatternError ? `Expressão regular inválida: ${searchPatternError}` : undefined}
+                    className={`h-8 w-full rounded-md border bg-slate-50 pl-9 pr-8 ${searchPatternError ? 'border-rose-400 dark:border-rose-700' : 'border-slate-200 dark:border-slate-700'} font-mono text-xs text-slate-900 placeholder:font-sans placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 disabled:opacity-50 dark:bg-slate-950 dark:text-slate-100 dark:focus:bg-slate-950`}
                   />
                   {searchTerm && (
                     <button
@@ -1039,11 +918,33 @@ export default function App() {
                     </button>
                   )}
                 </div>
+                <div className="flex h-8 shrink-0 overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={toggleSearchCaseSensitive}
+                    disabled={!activeTab}
+                    aria-pressed={searchCaseSensitive}
+                    title={searchCaseSensitive ? 'Diferenciando maiúsculas e minúsculas no próximo termo' : 'Diferenciar maiúsculas e minúsculas no próximo termo'}
+                    className={`flex w-8 cursor-pointer items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${searchCaseSensitive ? activeButtonClass : neutralButtonClass}`}
+                  >
+                    <CaseSensitive className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleSearchRegex}
+                    disabled={!activeTab}
+                    aria-pressed={searchRegex}
+                    title={searchRegex ? 'O próximo termo será tratado como expressão regular' : 'Tratar o próximo termo como expressão regular'}
+                    className={`flex w-8 cursor-pointer items-center justify-center border-l border-slate-200 transition-colors disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 ${searchRegex ? activeButtonClass : neutralButtonClass}`}
+                  >
+                    <Regex className="h-4 w-4" />
+                  </button>
+                </div>
                 <div className="flex h-8 shrink-0 overflow-hidden rounded-md border border-slate-200 text-[11px] font-semibold dark:border-slate-700">
                   <button
                     type="button"
                     onClick={() => addSearchFilter('include')}
-                    disabled={!searchTerm.trim()}
+                    disabled={!searchTerm.trim() || Boolean(searchPatternError)}
                     title="Mostrar registros que contêm este texto. Clique no conector entre os termos para alternar entre OU e E (E agrupa primeiro) (Enter)"
                     className="flex items-center gap-1 px-2.5 text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
                   >
@@ -1052,7 +953,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => addSearchFilter('exclude')}
-                    disabled={!searchTerm.trim()}
+                    disabled={!searchTerm.trim() || Boolean(searchPatternError)}
                     title="Ocultar registros que contêm este texto, além dos filtros de inclusão (Shift+Enter)"
                     className="flex items-center gap-1 border-l border-slate-200 px-2.5 text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-rose-400 dark:hover:bg-rose-950/50"
                   >
@@ -1061,8 +962,18 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Limit */}
+              {/* Period + limit */}
               <div className="flex items-center gap-1.5">
+                <TimeRangeFilter
+                  timeFrom={timeFrom}
+                  timeTo={timeTo}
+                  latestTime={latestEntryTime}
+                  disabled={!activeTab}
+                  buttonClassName={`${toolbarButtonClass} border border-slate-200 dark:border-slate-700`}
+                  activeClassName={activeButtonClass}
+                  neutralClassName={neutralButtonClass}
+                  onChange={setTimeRange}
+                />
                 <select
                   id="select-line-limit"
                   value={lineLimit}
@@ -1221,7 +1132,7 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={handleReload}
+                  onClick={reload}
                   title={isMergedView ? 'Recarregar os arquivos selecionados' : 'Recarregar arquivo'}
                   disabled={isLoading || selectedFiles.length === 0}
                   className={`${toolbarButtonClass} ${neutralButtonClass} px-2`}
@@ -1239,6 +1150,14 @@ export default function App() {
                   {copiedAll ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
                   <span className="hidden lg:inline">{copiedAll ? 'Copiado!' : 'Copiar'}</span>
                 </button>
+
+                <ExportMenu
+                  disabled={filteredEntries.length === 0}
+                  count={filteredEntries.length}
+                  buttonClassName={toolbarButtonClass}
+                  neutralClassName={neutralButtonClass}
+                  onExport={handleExport}
+                />
 
                 <button
                   type="button"
@@ -1289,6 +1208,12 @@ export default function App() {
               {levelFilter !== 'ALL' && (
                 <button type="button" onClick={() => setLevelFilter('ALL')} className="group flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 font-medium text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-300">
                   Nível: {LEVEL_OPTIONS.find((option) => option.value === levelFilter)?.label}
+                  <X className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                </button>
+              )}
+              {hasTimeRange && (
+                <button type="button" onClick={() => setTimeRange(undefined, undefined)} className="group flex shrink-0 items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 font-medium text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/40 dark:text-teal-300">
+                  Período: {describeTimeRange(timeFrom, timeTo)}
                   <X className="h-3 w-3 opacity-50 group-hover:opacity-100" />
                 </button>
               )}
@@ -1344,7 +1269,21 @@ export default function App() {
                 Formato de log não reconhecido em <strong>{unrecognizedFiles.join(', ')}</strong>. As linhas são exibidas
                 uma a uma, sem data e nível{isMergedView ? ', no início da linha do tempo' : ''}.
               </span>
-              <button type="button" onClick={() => setUnrecognizedFiles([])} className="ml-auto shrink-0 rounded p-0.5 hover:bg-amber-100 dark:hover:bg-amber-900/40" aria-label="Fechar aviso">
+              <button type="button" onClick={dismissUnrecognized} className="ml-auto shrink-0 rounded p-0.5 hover:bg-amber-100 dark:hover:bg-amber-900/40" aria-label="Fechar aviso">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {truncatedFiles.length > 0 && (
+            <div className="flex items-start gap-2 border-b border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-500" />
+              <span className="min-w-0 break-words">
+                <strong>{truncatedFiles.join(', ')}</strong> {truncatedFiles.length > 1 ? 'são maiores' : 'é maior'} que{' '}
+                {Math.round(MAX_INITIAL_READ_BYTES / (1024 * 1024))} MB: exibindo só o final do arquivo (os registros mais recentes).
+                Os números de linha contam a partir do trecho carregado.
+              </span>
+              <button type="button" onClick={dismissTruncated} className="ml-auto shrink-0 rounded p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40" aria-label="Fechar aviso">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>

@@ -12,6 +12,7 @@ import { LogEntry, EntryLogLevel } from '../types';
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const LINE_BREAK_REGEX = /\r?\n/;
 
 const LEVEL_ALIASES: Record<string, EntryLogLevel> = {
   INF: 'INF', INFO: 'INF', INFORMATION: 'INF', NOTICE: 'INF',
@@ -374,28 +375,8 @@ function linePerEntry(lines: string[]): LogEntry[] {
   return entries;
 }
 
-async function yieldForProgress(
-  lineIndex: number,
-  totalLines: number,
-  onProgress?: (progress: number, linesProcessed: number) => void
-): Promise<void> {
-  if (lineIndex === 0 || lineIndex % 15000 !== 0) return;
-  onProgress?.(Math.min(99, Math.round((lineIndex / totalLines) * 100)), lineIndex);
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-/**
- * Parses log content into structured LogEntries.
- * Lines that do not start a record (stack traces, exception dumps) are attached to the previous record.
- */
-export async function parseLogContentAsync(
-  content: string,
-  onProgress?: (progress: number, linesProcessed: number) => void,
-  options: ParseOptions = {}
-): Promise<ParseResult> {
-  const lines = content.split(/\r?\n/);
-  const totalLines = lines.length;
-  const state: ParserState = {
+function createParserState(): ParserState {
+  return {
     current: null,
     rawLines: [],
     awaitsMelMessage: false,
@@ -406,30 +387,126 @@ export async function parseLogContentAsync(
     lastTimeOfDay: null,
     timeOnlyEntries: [],
   };
+}
 
-  for (let i = 0; i < totalLines; i++) {
-    await yieldForProgress(i, totalLines, onProgress);
-    processLogLine(lines[i], i + 1, state);
+export interface ParseSnapshot extends ParseResult {
+  /** Entries before this index are unchanged since the previous snapshot; the rest replace them. */
+  fromIndex: number;
+}
+
+/**
+ * Incremental parser: text can be pushed in pieces (initial read, then whatever the live tail appends).
+ * The text after the last line break is kept as a provisional line until the next push, and the
+ * record still open at the end is reported as provisional too, so each snapshot only carries what changed.
+ * Finished records are handed over by `snapshot()` and not kept here, so a long-lived session stays small.
+ */
+export class LogParseSession {
+  private state = createParserState();
+  private partial = '';
+  private lineCount = 0;
+  private nonBlankLines = 0;
+  /** Finished records already handed over (they are the first `releasedCount` entries of the timeline). */
+  private releasedCount = 0;
+  private sawTimeOnly = false;
+  /** Raw lines kept while no record start was recognized, for the line-by-line fallback. */
+  private fallbackLines: string[] | null = [];
+
+  constructor(private readonly options: ParseOptions = {}) {}
+
+  push(text: string): void {
+    if (!text) return;
+    const lines = (this.partial + text).split(LINE_BREAK_REGEX);
+    this.partial = lines.pop() ?? '';
+    for (const line of lines) this.processLine(line);
   }
-  finalizeEntry(state);
 
-  if (state.timeOnlyEntries.length > 0) {
-    // The last day of a time-only log is assumed to be the day the file was last written.
-    const reference = new Date(options.referenceTime ?? Date.now());
-    reference.setHours(0, 0, 0, 0);
-    const firstDay = reference.getTime() - state.dayOffset * DAY_MS;
-    state.timeOnlyEntries.forEach((entry) => {
-      entry.time = (entry.time ?? 0) + firstDay;
-    });
+  /**
+   * Live appends only work for dated, recognized logs: time-only logs anchor every record to the
+   * file's last day and unrecognized files are shown line by line, so both are re-read in full.
+   */
+  get canAppend(): boolean {
+    return this.state.recognizedStarts > 0 && !this.sawTimeOnly;
   }
 
-  onProgress?.(100, totalLines);
+  snapshot(): ParseSnapshot {
+    const totalLines = this.lineCount + 1;
+    const formatRecognized = this.state.recognizedStarts > 0 || this.nonBlankLines + (this.partial.trim() ? 1 : 0) <= 1;
 
-  const formatRecognized =
-    state.recognizedStarts > 0 || lines.filter((line) => line.trim() !== '').length <= 1;
-  return {
-    entries: formatRecognized ? state.entries : linePerEntry(lines),
-    totalLines,
-    formatRecognized,
-  };
+    if (!formatRecognized) {
+      return { fromIndex: 0, entries: linePerEntry([...(this.fallbackLines ?? []), this.partial]), totalLines, formatRecognized };
+    }
+
+    // Finish a copy of the open record (plus the provisional last line) without touching the real state.
+    const timeOnly = new Set(this.state.timeOnlyEntries);
+    const openRecord = this.state.current ? { ...this.state.current, stackTrace: [...this.state.current.stackTrace] } : null;
+    const preview: ParserState = {
+      ...this.state,
+      current: openRecord,
+      rawLines: [...this.state.rawLines],
+      entries: [],
+      timeOnlyEntries: openRecord && this.state.current && timeOnly.has(this.state.current) ? [openRecord] : [],
+    };
+    if (this.partial) processLogLine(this.partial, this.lineCount + 1, preview);
+    finalizeEntry(preview);
+
+    let finished = this.state.entries;
+    if (this.sawTimeOnly || preview.timeOnlyEntries.length > 0) {
+      // The last day of a time-only log is assumed to be the day the file was last written.
+      // Stored times stay relative to the first day, so the anchoring is applied to copies.
+      const reference = new Date(this.options.referenceTime ?? Date.now());
+      reference.setHours(0, 0, 0, 0);
+      const firstDay = reference.getTime() - preview.dayOffset * DAY_MS;
+      finished = finished.map((entry) => (timeOnly.has(entry) ? { ...entry, time: (entry.time ?? 0) + firstDay } : entry));
+      preview.timeOnlyEntries.forEach((entry) => {
+        entry.time = (entry.time ?? 0) + firstDay;
+      });
+    }
+
+    const fromIndex = this.releasedCount;
+    const entries = [...finished, ...preview.entries];
+    this.releasedCount += this.state.entries.length;
+    this.state.entries = [];
+    this.state.timeOnlyEntries = this.state.current && timeOnly.has(this.state.current) ? [this.state.current] : [];
+    return { fromIndex, entries, totalLines, formatRecognized };
+  }
+
+  private processLine(line: string): void {
+    this.lineCount++;
+    if (line.trim() !== '') this.nonBlankLines++;
+    processLogLine(line, this.lineCount, this.state);
+    if (this.state.timeOnlyEntries.length > 0) this.sawTimeOnly = true;
+    if (this.fallbackLines) {
+      if (this.state.recognizedStarts > 0) this.fallbackLines = null;
+      else this.fallbackLines.push(line);
+    }
+  }
+}
+
+/** Splits text into pieces of about `size` characters, so long parses can report progress. */
+export function* textChunks(text: string, size = 4 * 1024 * 1024): Generator<string> {
+  for (let index = 0; index < text.length; index += size) yield text.slice(index, index + size);
+}
+
+/**
+ * Parses log content into structured LogEntries.
+ * Lines that do not start a record (stack traces, exception dumps) are attached to the previous record.
+ */
+export async function parseLogContentAsync(
+  content: string,
+  onProgress?: (progress: number) => void,
+  options: ParseOptions = {}
+): Promise<ParseResult> {
+  const session = new LogParseSession(options);
+  let processed = 0;
+  for (const chunk of textChunks(content, 512 * 1024)) {
+    session.push(chunk);
+    processed += chunk.length;
+    if (processed < content.length) {
+      onProgress?.(Math.min(99, Math.round((processed / content.length) * 100)));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+  onProgress?.(100);
+  const { entries, totalLines, formatRecognized } = session.snapshot();
+  return { entries, totalLines, formatRecognized };
 }

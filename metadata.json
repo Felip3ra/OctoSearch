@@ -1,6 +1,0 @@
-{
-  "name": "OctoSearch",
-  "description": "Aplicativo para leitura, pesquisa e análise de arquivos de log.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
