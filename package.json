@@ -26,6 +26,10 @@
     "appId": "com.octosearch.desktop",
     "productName": "OctoSearch",
     "artifactName": "OctoSearch.${ext}",
+    "electronLanguages": [
+      "pt-BR",
+      "en-US"
+    ],
     "directories": {
       "output": "dist-exe"
     },

@@ -46,6 +46,7 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 - O tempo real é avisado pelo sistema (`fs.watch`) quando o arquivo muda e ainda confere de tempos em tempos, porque esses avisos falham em pastas de rede.
 - Arquivos acima de 200 MB são abertos pelo final (os registros mais recentes), com aviso na tela.
 - Listas com milhões de registros agora rolam até o fim (antes o navegador limitava a altura) e atualizam bem mais rápido.
+- Pacote menor: o app leva só os idiomas pt-BR e en-US do Chromium (47 MB a menos instalado; instalador de 114 para 105 MB).
 
 **Segurança**
 
