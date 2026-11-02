@@ -4,7 +4,7 @@ import { appendInWorker, disposeWorkerSessions, parseInWorker } from '../service
 import { isGzipFileName, LogEncoding } from '../services/logDecoding';
 import { IncrementalMerger } from '../services/logMerge';
 import { buildSourceLabels, isNativeFile } from '../utils/logFile';
-import { describeReadError } from '../utils/folderAccess';
+import { describeDesktopError, desktop } from '../services/platform';
 
 /** Larger files are opened by their end (the most recent records) to keep memory under control. */
 export const MAX_INITIAL_READ_BYTES = 200 * 1024 * 1024;
@@ -35,7 +35,8 @@ const FAILED_FILE: ParsedFile = {
 };
 
 async function readLogBytes(file: LogFileItem): Promise<FileReadResult> {
-  if (window.electronAPI?.readFile && isNativeFile(file)) return window.electronAPI.readFile(file.path);
+  const api = desktop();
+  if (api?.readFile && isNativeFile(file)) return api.readFile(file.path);
   if (file.file) {
     const start = !isGzipFileName(file.name) && file.size > MAX_INITIAL_READ_BYTES ? file.size - MAX_INITIAL_READ_BYTES : 0;
     const bytes = new Uint8Array(await file.file.slice(start).arrayBuffer());
@@ -76,7 +77,7 @@ async function parseWholeFile(
 
 /** Reads only what was appended to the file; null when it has to be parsed again in full. */
 async function appendToFile(file: LogFileItem, current: ParsedFile): Promise<ParsedFile | null> {
-  const readFileFrom = window.electronAPI?.readFileFrom;
+  const readFileFrom = desktop()?.readFileFrom;
   if (!readFileFrom || !current.canAppend) return null;
   const read = await readFileFrom(file.path, current.size);
   if (!read) return null;
@@ -169,7 +170,7 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
           } catch (err: unknown) {
             if (!isCurrent()) return;
             console.error(err);
-            failures.push(`${file.name}: ${describeReadError(err)}`);
+            failures.push(`${file.name}: ${describeDesktopError(err)}`);
             // Unknown stats make live polling retry this file instead of blocking the whole selection.
             parsed.set(file.id, FAILED_FILE);
           }
@@ -214,7 +215,7 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
 
   // Live view (Electron): file-system events trigger an immediate check, polling covers missed events.
   useEffect(() => {
-    const api = window.electronAPI;
+    const api = desktop();
     const checkFileStats = api?.checkFileStats;
     const watchedFiles = selectedFiles.filter(isNativeFile);
     if (!isLiveTailing || !checkFileStats || watchedFiles.length === 0) {

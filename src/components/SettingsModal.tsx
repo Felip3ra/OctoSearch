@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Bell, Files, FolderLock, Keyboard, Moon, Settings, Sun, WrapText, X } from 'lucide-react';
 import { FileSortField, SortDirection } from '../types';
+import { capabilities, desktop } from '../services/platform';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ interface NotificationsSectionProps {
 
 /** System notifications for the live view (desktop app only). */
 function NotificationsSection({ errors, terms, onErrorsChange, onTermsChange }: Readonly<NotificationsSectionProps>) {
-  if (!window.electronAPI?.notify) return null;
+  if (!capabilities.notifies) return null;
   return (
     <div>
       <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -85,7 +86,7 @@ function folderName(folder: string): string {
 
 /** Folders the desktop app may read; each one can be revoked (the app asks again the next time). */
 function AllowedFoldersSection() {
-  const api = window.electronAPI;
+  const api = desktop();
   const [folders, setFolders] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 

@@ -1,3 +1,4 @@
+import { desktop } from '../services/platform';
 import React, { useState } from 'react';
 import {
   Folder,
@@ -37,7 +38,7 @@ export function SavedFoldersModal({
   const [filterQuery, setFilterQuery] = useState('');
   const [newFolderPath, setNewFolderPath] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
-  const isElectron = Boolean(window.electronAPI?.isElectron);
+  const isElectron = Boolean(desktop()?.isElectron);
 
   if (!isOpen) return null;
 

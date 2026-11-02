@@ -3,6 +3,7 @@ import { LogEntry } from '../types';
 import { entryKey, entryMessage, entrySearchText } from '../services/logEntry';
 import { createAnyPatternMatcher } from '../services/logSearch';
 import { sharedPrefixLength } from '../services/logView';
+import { desktop } from '../services/platform';
 
 export interface NotificationSettings {
   /** Notify about new ERR records. */
@@ -36,7 +37,7 @@ export function useLiveNotifications(entries: LogEntry[], lastLiveUpdate: Date |
     previousUpdate.current = lastLiveUpdate;
 
     const terms = parseNotificationTerms(settings.terms);
-    const notify = window.electronAPI?.notify;
+    const notify = desktop()?.notify;
     if (!isLiveUpdate || !notify || (!settings.errors && terms.length === 0)) return;
     const kept = sharedPrefixLength(previous, entries);
     if (kept === 0) return; // the file was read again from the start

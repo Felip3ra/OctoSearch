@@ -279,9 +279,9 @@ export function VirtualLogViewer({
   const indexOfEntry = useMemo(() => {
     const count = allEntries.length;
     const sequential = count === 0 || (allEntries[0].id === 1 && allEntries[count - 1].id === count);
-    const positions = sequential ? null : new Map(allEntries.map((entry, position) => [entry.id, position]));
+    const indexById = sequential ? null : new Map(allEntries.map((entry, position) => [entry.id, position]));
     return (id: number): number | undefined => {
-      if (positions) return positions.get(id);
+      if (indexById) return indexById.get(id);
       return allEntries[id - 1]?.id === id ? id - 1 : undefined;
     };
   }, [allEntries]);

@@ -135,7 +135,11 @@ Estrutura principal:
 | `electron/folderAccess.cjs` | Pastas liberadas e verificação de caminho (testado em `folderAccess.test.ts`) |
 | `src/services/logParser.ts` | Parser de formatos e sessão incremental (`LogParseSession`) |
 | `src/services/parseWorkerCore.ts` | Lógica do Web Worker: decodificação, `.gz`, parse e acréscimos |
+| `src/App.tsx` | Só a composição da tela: o estado fica nos hooks, a interface nos componentes |
 | `src/hooks/useLogLoader.ts` | Leitura, parse no worker e tempo real dos arquivos selecionados |
+| `src/hooks/useTabs.ts` · `useFolderOpening.ts` | Abas; pastas salvas, sessão anterior, pastas negadas e arquivos abertos pelo sistema |
+| `src/hooks/useTabFilters.ts` · `useFilteredEntries.ts` | Estado dos filtros da aba e o pipeline incremental (filtro, período, contagem, linha do tempo) |
+| `src/services/platform.ts` | Único ponto que conhece o Electron: `desktop()`, `capabilities` e os códigos de erro do IPC |
 | `src/services/logSearch.ts` | Filtros (E/OU, regex, maiúsculas, campos, período, nível, limite) e destaque |
 | `src/services/logEntry.ts` | Formato compacto do registro e leitura de data, mensagem e stack trace |
 | `src/services/logView.ts` | Filtro e contagem incrementais (só processam os registros novos) |

@@ -1,3 +1,4 @@
+import { capabilities, desktop } from '../services/platform';
 import React, { useEffect, useRef, useState } from 'react';
 import { FolderTab, LogFileItem, SavedFolder } from '../types';
 import { sortFilesByName } from '../utils/fileSorter';
@@ -73,7 +74,7 @@ export function FolderTabs({
     ? savedFolders.find((f) => f.path.toLowerCase() === activeTab.folderPath.toLowerCase())
     : null;
   const isCurrentFavorite = currentSaved?.isFavorite ?? false;
-  const isDesktop = Boolean(window.electronAPI?.isElectron);
+  const isDesktop = Boolean(desktop()?.isElectron);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -149,9 +150,10 @@ export function FolderTabs({
   };
 
   const selectElectronFolder = async (): Promise<boolean> => {
-    if (!window.electronAPI?.selectFolder) return false;
+    const api = desktop();
+    if (!api?.selectFolder) return false;
     try {
-      const result = await window.electronAPI.selectFolder();
+      const result = await api.selectFolder();
       if (!result) return true;
       if (result.files.length === 0) {
         alert(`A pasta selecionada (${result.folderPath}) não contém arquivos de log compatíveis.`);
@@ -496,8 +498,8 @@ export function FolderTabs({
           <button type="button" role="menuitem" onClick={() => { void navigator.clipboard.writeText(contextMenu.tab.folderPath); setContextMenu(null); }} className={menuItemClass}>
             <Copy className="h-3.5 w-3.5" /> Copiar caminho
           </button>
-          {window.electronAPI?.openInExplorer && (
-            <button type="button" role="menuitem" onClick={() => { void window.electronAPI?.openInExplorer?.(contextMenu.tab.folderPath); setContextMenu(null); }} className={menuItemClass}>
+          {capabilities.revealsInFileManager && (
+            <button type="button" role="menuitem" onClick={() => { void desktop()?.openInExplorer?.(contextMenu.tab.folderPath); setContextMenu(null); }} className={menuItemClass}>
               <ExternalLink className="h-3.5 w-3.5" /> Mostrar no Explorer
             </button>
           )}

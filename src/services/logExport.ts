@@ -1,5 +1,6 @@
 import { LogEntry } from '../types';
 import { entryMessage, entryStackTrace, entryTimestamp } from './logEntry';
+import { desktop } from './platform';
 
 export type ExportFormat = 'log' | 'csv';
 
@@ -44,8 +45,9 @@ export function exportFileName(baseName: string, format: ExportFormat, now = new
 
 /** Saves through the native dialog in the desktop app, or as a browser download. Returns false if cancelled. */
 export async function saveExport(fileName: string, content: string): Promise<boolean> {
-  if (window.electronAPI?.saveTextFile) {
-    return (await window.electronAPI.saveTextFile({ defaultName: fileName, content })) !== null;
+  const saveTextFile = desktop()?.saveTextFile;
+  if (saveTextFile) {
+    return (await saveTextFile({ defaultName: fileName, content })) !== null;
   }
   const url = URL.createObjectURL(new Blob([content], { type: fileName.endsWith('.csv') ? 'text/csv' : 'text/plain' }));
   const link = document.createElement('a');

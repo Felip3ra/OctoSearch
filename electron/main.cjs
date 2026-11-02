@@ -28,7 +28,7 @@ async function scanDirectoryForLogs(folderPath) {
     const rootStat = await fs.promises.stat(folderPath);
     if (!rootStat.isDirectory()) throw new Error('not a directory');
   } catch {
-    throw new Error(`Pasta não encontrada: ${folderPath}`);
+    throw codedError('NOT_FOUND', `Pasta não encontrada: ${folderPath}`);
   }
 
   const results = [];
@@ -113,6 +113,21 @@ async function scanDirectoryForLogs(folderPath) {
 // arquivos arbitrários do computador.
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Errors the window reacts to carry a code at the start of the message ("[CODE] text"): only the message
+ * crosses the IPC boundary. Keep in sync with `DesktopErrorCode` in src/services/platform.ts.
+ */
+const ErrorCode = Object.freeze({
+  FOLDER_DENIED: 'FOLDER_DENIED',
+  OUTSIDE_ALLOWED_FOLDERS: 'OUTSIDE_ALLOWED_FOLDERS',
+  UNSUPPORTED_FILE: 'UNSUPPORTED_FILE',
+  NOT_FOUND: 'NOT_FOUND',
+});
+
+function codedError(code, message, cause) {
+  return new Error(`[${ErrorCode[code]}] ${message}`, cause ? { cause } : undefined);
+}
+
 function assertTrustedSender(event) {
   const url = event.senderFrame?.url || '';
   if (!url.startsWith('file://') || event.sender !== mainWindow?.webContents) {
@@ -149,7 +164,7 @@ async function requestFolderAccess(folderPath) {
     noLink: true,
   };
   const { response } = mainWindow ? await dialog.showMessageBox(mainWindow, options) : await dialog.showMessageBox(options);
-  if (response !== 0) throw new Error(`Acesso à pasta não autorizado: ${folderPath}`);
+  if (response !== 0) throw codedError('FOLDER_DENIED', `Acesso à pasta não autorizado: ${folderPath}`);
   allowedFolders.add(realFolder);
   return realFolder;
 }
@@ -163,15 +178,15 @@ async function resolveAllowedLogFile(filePath) {
   const inZip = splitZipPath(filePath);
   const diskPath = inZip ? inZip.zipPath : filePath;
   const logName = inZip ? path.posix.basename(inZip.innerName) : path.basename(filePath);
-  if (!isSupportedLogFileName(logName)) throw new Error(`Tipo de arquivo não permitido: ${filePath}`);
+  if (!isSupportedLogFileName(logName)) throw codedError('UNSUPPORTED_FILE', `Tipo de arquivo não permitido: ${filePath}`);
   let realFile;
   try {
     realFile = await fs.promises.realpath(diskPath);
   } catch (error) {
-    if (error?.code === 'ENOENT') throw new Error(`Arquivo não encontrado: ${filePath}`, { cause: error });
+    if (error?.code === 'ENOENT') throw codedError('NOT_FOUND', `Arquivo não encontrado: ${filePath}`, error);
     throw error;
   }
-  if (!allowedFolders.has(realFile)) throw new Error(`Arquivo fora das pastas liberadas: ${filePath}`);
+  if (!allowedFolders.has(realFile)) throw codedError('OUTSIDE_ALLOWED_FOLDERS', `Arquivo fora das pastas liberadas: ${filePath}`);
   return { realFile, innerName: inZip ? inZip.innerName : null };
 }
 

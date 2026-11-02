@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { FileSortField, LogFileItem, SortDirection } from '../types';
 import { sortFiles } from '../utils/fileSorter';
+import { capabilities, desktop } from '../services/platform';
 
 interface FileListProps {
   files: LogFileItem[];
@@ -466,8 +467,8 @@ export function FileList({
           <button type="button" role="menuitem" onClick={() => { void navigator.clipboard.writeText(targetPath); setContextMenu(null); }} className={menuItemClass}>
             <Copy className="h-3.5 w-3.5" /> Copiar caminho
           </button>
-          {window.electronAPI?.openInExplorer && (
-            <button type="button" role="menuitem" onClick={() => { void window.electronAPI?.openInExplorer?.(targetPath); setContextMenu(null); }} className={menuItemClass}>
+          {capabilities.revealsInFileManager && (
+            <button type="button" role="menuitem" onClick={() => { void desktop()?.openInExplorer?.(targetPath); setContextMenu(null); }} className={menuItemClass}>
               <ExternalLink className="h-3.5 w-3.5" /> Mostrar no Explorer
             </button>
           )}
