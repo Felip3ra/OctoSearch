@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, Files, FolderLock, Keyboard, Moon, Settings, Sun, WrapText, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bell, Files, FolderLock, Keyboard, Moon, Settings, Sun, WrapText, X } from 'lucide-react';
 import { FileSortField, SortDirection } from '../types';
 
 interface SettingsModalProps {
@@ -12,6 +12,10 @@ interface SettingsModalProps {
   onToggleWordWrap: () => void;
   onFileSortFieldChange: (field: FileSortField) => void;
   onSortDirectionChange: (direction: SortDirection) => void;
+  notifyErrors: boolean;
+  notifyTerms: string;
+  onNotifyErrorsChange: (enabled: boolean) => void;
+  onNotifyTermsChange: (terms: string) => void;
   onClose: () => void;
 }
 
@@ -23,8 +27,52 @@ const SHORTCUTS = [
   ['Shift + clique', 'Selecionar um intervalo de arquivos'],
   ['Ctrl + A (na lista)', 'Selecionar todos os arquivos'],
   ['Ctrl + Shift + W', 'Alternar quebra de linha'],
+  ['F8 / Shift + F8', 'Próximo / anterior erro (ERR)'],
+  ['Ctrl + B', 'Marcar / desmarcar o registro selecionado'],
+  ['F2 / Shift + F2', 'Próximo / anterior registro marcado'],
+  ['Ctrl + G', 'Ir para uma linha'],
   ['Ctrl + ,', 'Abrir configurações'],
 ];
+
+interface NotificationsSectionProps {
+  errors: boolean;
+  terms: string;
+  onErrorsChange: (enabled: boolean) => void;
+  onTermsChange: (terms: string) => void;
+}
+
+/** System notifications for the live view (desktop app only). */
+function NotificationsSection({ errors, terms, onErrorsChange, onTermsChange }: Readonly<NotificationsSectionProps>) {
+  if (!window.electronAPI?.notify) return null;
+  return (
+    <div>
+      <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
+        <Bell className="h-3.5 w-3.5" />
+        Notificações do tempo real
+      </h3>
+      <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+        <label className="flex cursor-pointer items-center justify-between gap-3 text-sm font-medium">
+          <span>Avisar quando surgir um erro (ERR)</span>
+          <input type="checkbox" checked={errors} onChange={(event) => onErrorsChange(event.target.checked)} className="h-4 w-4 accent-sky-600" />
+        </label>
+        <label className="block text-xs font-medium text-slate-700 dark:text-slate-200">
+          <span>Avisar também quando aparecer algum destes termos (separados por vírgula)</span>
+          <input
+            type="text"
+            value={terms}
+            onChange={(event) => onTermsChange(event.target.value)}
+            placeholder="timeout, OutOfMemory, pagamento recusado"
+            className="mt-1.5 w-full rounded border border-slate-300 bg-white px-2.5 py-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-800"
+          />
+        </label>
+        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+          O aviso do sistema aparece só quando a janela do OctoSearch não está em foco, para os arquivos com o tempo
+          real ligado. Vários registros seguidos viram um aviso só.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /** Long paths keep their end, which is what tells two folders apart. */
 function shortenPath(folder: string, max = 64): string {
@@ -115,6 +163,10 @@ export function SettingsModal({
   onToggleWordWrap,
   onFileSortFieldChange,
   onSortDirectionChange,
+  notifyErrors,
+  notifyTerms,
+  onNotifyErrorsChange,
+  onNotifyTermsChange,
   onClose,
 }: Readonly<SettingsModalProps>) {
   if (!isOpen) return null;
@@ -227,6 +279,13 @@ export function SettingsModal({
               </div>
             </div>
           </div>
+
+          <NotificationsSection
+            errors={notifyErrors}
+            terms={notifyTerms}
+            onErrorsChange={onNotifyErrorsChange}
+            onTermsChange={onNotifyTermsChange}
+          />
 
           <AllowedFoldersSection />
 

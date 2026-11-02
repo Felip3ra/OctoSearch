@@ -1,0 +1,59 @@
+# Gera os .dmg do OctoSearch (Apple Silicon e Intel) num runner macOS.
+# - push na main: só gera e guarda os pacotes como artefato (valida o build macOS).
+# - release publicada (criada pelo publicar-atualizacao.bat): gera e anexa os pacotes à release.
+# Sem certificado da Apple o app é assinado ad hoc: o macOS pede confirmação na primeira abertura.
+name: Release macOS
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'site/**'
+      - 'docs/**'
+      - '**/*.md'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verificar tipos, lint e testes
+        run: |
+          npm run lint
+          npm test
+
+      - name: Gerar os .dmg
+        if: github.event_name != 'release'
+        run: npm run build:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Gerar os .dmg e enviar para a release
+        if: github.event_name == 'release'
+        run: npm run release:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guardar os pacotes como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: octosearch-macos
+          path: dist-exe/*.dmg
+          if-no-files-found: error

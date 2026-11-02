@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
+  LogEntry,
   LogFileItem,
   LogLevel,
   FolderTab,
@@ -10,13 +11,20 @@ import {
   SearchMode,
   FileSortField,
   SortDirection,
+  LaunchPath,
 } from './types';
 import { getIncludeBlocks, getPatternError } from './services/logSearch';
 import { IncrementalFilter, IncrementalLevelCounter } from './services/logView';
+import { IncrementalHistogram } from './services/logHistogram';
+import { looksLikeFieldFilter } from './services/logFields';
+import { entryKey } from './services/logEntry';
+import { TimelineHistogram } from './components/TimelineHistogram';
+import { ErrorGroupsPanel } from './components/ErrorGroupsPanel';
 import { getSourceColor } from './services/logMerge';
 import { buildExport, ExportFormat, exportFileName, saveExport } from './services/logExport';
 import { useLogLoader, MAX_INITIAL_READ_BYTES } from './hooks/useLogLoader';
-import { booleanCodec, enumCodec, PersistedStateCodec, usePersistedState } from './hooks/usePersistedState';
+import { booleanCodec, enumCodec, PersistedStateCodec, stringCodec, usePersistedState } from './hooks/usePersistedState';
+import { useLiveNotifications } from './hooks/useLiveNotifications';
 import { sortFilesByName } from './utils/fileSorter';
 import {
   buildSourceLabels,
@@ -66,6 +74,8 @@ import {
   FileText,
   FolderOpen,
   ShieldAlert,
+  BarChart3,
+  ListOrdered,
 } from 'lucide-react';
 import { isFolderAccessDenied } from './utils/folderAccess';
 
@@ -262,12 +272,22 @@ export default function App() {
     highlightRulesCodec
   );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  /** Files and folders the system asked the app to open (double click, "Open with", command line). */
+  const [launchQueue, setLaunchQueue] = useState<LaunchPath[]>([]);
   /** Saved or restored folders whose access the user did not allow; they can be retried from a notice. */
   const [deniedFolders, setDeniedFolders] = useState<{ path: string; name: string }[]>([]);
   const noteDeniedFolder = (path: string, name: string) => setDeniedFolders((current) => withDeniedFolder(current, path, name));
   const forgetDeniedFolder = (path: string) =>
     setDeniedFolders((current) => current.filter((item) => !samePath(item.path, path)));
   const [wordWrap, setWordWrap] = usePersistedState('log-viewer-word-wrap', false, booleanCodec);
+  const [notifyErrors, setNotifyErrors] = usePersistedState('log-viewer-notify-errors', false, booleanCodec);
+  const [showTimeline, setShowTimeline] = usePersistedState('log-viewer-show-timeline', true, booleanCodec);
+  const [isErrorGroupsOpen, setIsErrorGroupsOpen] = useState(false);
+  /** Request for the viewer to scroll to a record (a new nonce repeats it). */
+  const [navigateTo, setNavigateTo] = useState<{ entryId: number; nonce: number } | null>(null);
+  /** Marked records, per selection of files (keys from entryKey). */
+  const [bookmarks, setBookmarks] = useState<Map<string, Set<string>>>(() => new Map());
+  const [notifyTerms, setNotifyTerms] = usePersistedState('log-viewer-notify-terms', '', stringCodec);
   const [fileSortField, setFileSortField] = usePersistedState<FileSortField>(
     'log-viewer-file-sort-field',
     'name',
@@ -305,6 +325,8 @@ export default function App() {
     reload,
   } = useLogLoader(selectedFiles, isLiveTailing);
 
+  useLiveNotifications(entries, lastLiveUpdate, { errors: notifyErrors, terms: notifyTerms });
+
   const updateActiveTab = useCallback(
     (updater: (tab: FolderTab) => FolderTab) => {
       if (!activeTab) return;
@@ -326,8 +348,10 @@ export default function App() {
   };
 
   // Open a folder in a new tab (or refresh the existing tab for the same native folder)
-  const handleOpenNewFolder = (folderPath: string, rawFiles: LogFileItem[], preferredName?: string) => {
+  const handleOpenNewFolder = (folderPath: string, rawFiles: LogFileItem[], preferredName?: string, selectPaths?: string[]) => {
     const files = sortFilesByName(rawFiles, true);
+    const wanted = new Set((selectPaths ?? []).map((item) => item.toLowerCase()));
+    const requestedSelection = files.filter((file) => wanted.has(file.path.toLowerCase())).map((file) => file.id);
     const isNativeFolder = files.length > 0 && files.every(isNativeFile);
     const savedName = savedFolders.find((folder) => samePath(folder.path, folderPath))?.name;
     const existing = isNativeFolder ? tabs.find((tab) => samePath(tab.folderPath, folderPath)) : undefined;
@@ -336,12 +360,14 @@ export default function App() {
     if (existing) {
       setTabs((prev) =>
         prev.map((tab) =>
-          tab.id === existing.id ? { ...tab, files, selectedFileIds: remapSelection(tab, files) } : tab
+          tab.id === existing.id
+            ? { ...tab, files, selectedFileIds: requestedSelection.length > 0 ? requestedSelection : remapSelection(tab, files) }
+            : tab
         )
       );
       setActiveTabId(existing.id);
     } else {
-      const newTab = createFolderTab(`tab-${Date.now()}`, folderName, folderPath, files);
+      const newTab = createFolderTab(`tab-${Date.now()}`, folderName, folderPath, files, requestedSelection.length > 0 ? requestedSelection : undefined);
       setTabs((prev) => [...prev, newTab]);
       setActiveTabId(newTab.id);
     }
@@ -401,6 +427,45 @@ export default function App() {
       setIsLoading(false);
     }
   };
+
+  // Paths the system asked to open: queued at startup by the main process, or sent while running.
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.takeLaunchPaths) return;
+    const unsubscribe = api.onOpenPaths?.((paths) => setLaunchQueue((queue) => [...queue, ...paths]));
+    api.takeLaunchPaths().then((paths) => {
+      if (paths.length > 0) setLaunchQueue((queue) => [...queue, ...paths]);
+    }, () => {});
+    return unsubscribe;
+  }, []);
+
+  // Each requested file opens its folder in a tab (or reuses the tab) with that file selected.
+  useEffect(() => {
+    if (launchQueue.length === 0 || !window.electronAPI?.readFolder) return;
+    const batch = launchQueue;
+    setLaunchQueue([]);
+    const folders = new Map<string, LaunchPath[]>();
+    for (const item of batch) {
+      const key = [...folders.keys()].find((folder) => samePath(folder, item.folder)) ?? item.folder;
+      folders.set(key, [...(folders.get(key) ?? []), item]);
+    }
+    void (async () => {
+      for (const [folder, items] of folders) {
+        try {
+          const nativeFiles = await window.electronAPI!.readFolder(folder);
+          const files = nativeFilesToItems(nativeFiles, `launch-${Date.now()}`);
+          const selectPaths = items.filter((item) => !item.isDirectory).map((item) => item.path);
+          if (files.length === 0) {
+            alert(`A pasta ${folder} não contém arquivos de log compatíveis.`);
+            continue;
+          }
+          handleOpenNewFolder(folder, files, undefined, selectPaths);
+        } catch (error) {
+          alert(`Não foi possível abrir ${folder}: ${(error as Error)?.message || error}`);
+        }
+      }
+    })();
+  }, [launchQueue, handleOpenNewFolder]);
 
   // Restore the tabs that were open in the last desktop session.
   // First run after the update (no session saved yet): reopen only the favorite folders.
@@ -532,8 +597,9 @@ export default function App() {
   const searchMode = activeTab?.searchMode || 'include';
   const searchFilters = activeTab?.searchFilters || NO_SEARCH_FILTERS;
   const includeOperator = activeTab?.includeOperator || 'or';
+  // Field filters ($campo = valor) select records but are not text to highlight.
   const includedSearchTerms = useMemo(
-    () => searchFilters.filter((filter) => filter.mode === 'include'),
+    () => searchFilters.filter((filter) => filter.mode === 'include' && !looksLikeFieldFilter(filter.text)),
     [searchFilters]
   );
   const levelFilter = activeTab?.levelFilter || 'ALL';
@@ -682,24 +748,63 @@ export default function App() {
   const setLineLimitDirection = (direction: 'tail' | 'head') =>
     updateActiveTab((tab) => ({ ...tab, lineLimitDirection: direction }));
 
-  // Both remember the previous timeline, so live updates only look at the new records.
-  const [entryFilter] = useState(() => new IncrementalFilter());
+  // All of these remember the previous timeline, so live updates only look at the new records.
+  const [textFilter] = useState(() => new IncrementalFilter());
+  const [periodFilter] = useState(() => new IncrementalFilter());
   const [levelCounter] = useState(() => new IncrementalLevelCounter());
+  const [histogramBuilder] = useState(() => new IncrementalHistogram());
 
-  const filteredEntries = useMemo(() => {
-    return entryFilter.apply(entries, {
-      searchTerm: '',
-      searchMode,
-      searchFilters,
-      includeOperator,
-      level: levelFilter,
-      lineLimit,
-      customLineLimit,
-      lineLimitDirection,
-      timeFrom,
-      timeTo,
-    });
-  }, [entryFilter, entries, searchMode, searchFilters, includeOperator, levelFilter, lineLimit, customLineLimit, lineLimitDirection, timeFrom, timeTo]);
+  // Two steps: terms and level first (what the timeline shows), then the period and the line limit.
+  const entriesBeforePeriod = useMemo(
+    () => textFilter.apply(entries, { searchTerm: '', searchMode, searchFilters, includeOperator, level: levelFilter }),
+    [textFilter, entries, searchMode, searchFilters, includeOperator, levelFilter]
+  );
+
+  const filteredEntries = useMemo(
+    () =>
+      periodFilter.apply(entriesBeforePeriod, {
+        searchTerm: '',
+        level: 'ALL',
+        lineLimit,
+        customLineLimit,
+        lineLimitDirection,
+        timeFrom,
+        timeTo,
+      }),
+    [periodFilter, entriesBeforePeriod, lineLimit, customLineLimit, lineLimitDirection, timeFrom, timeTo]
+  );
+
+  const histogram = useMemo(
+    () => (showTimeline ? histogramBuilder.compute(entriesBeforePeriod) : null),
+    [showTimeline, histogramBuilder, entriesBeforePeriod]
+  );
+
+  const selectionKey = useMemo(() => selectedFiles.map((file) => file.path.toLowerCase()).sort().join('|'), [selectedFiles]);
+  const bookmarkedKeys = useMemo(() => bookmarks.get(selectionKey) ?? new Set<string>(), [bookmarks, selectionKey]);
+  const toggleBookmark = useCallback(
+    (entry: LogEntry) =>
+      setBookmarks((current) => {
+        const next = new Map(current);
+        const keys = new Set(next.get(selectionKey));
+        const key = entryKey(entry);
+        if (keys.has(key)) keys.delete(key);
+        else keys.add(key);
+        next.set(selectionKey, keys);
+        return next;
+      }),
+    [selectionKey]
+  );
+
+  const filterByGroup = (pattern: string) => {
+    updateActiveTab((tab) => ({
+      ...tab,
+      searchFilters: [
+        ...(tab.searchFilters || []),
+        { id: `search-filter-${Date.now()}-${crypto.randomUUID()}`, text: pattern, mode: 'include', regex: true },
+      ],
+    }));
+    setIsErrorGroupsOpen(false);
+  };
 
   const latestEntryTime = useMemo(() => {
     for (let index = entries.length - 1; index >= 0; index--) {
@@ -944,7 +1049,11 @@ export default function App() {
                     disabled={!activeTab}
                     placeholder={searchRegex ? 'Expressão regular…  Enter inclui · Shift+Enter exclui' : 'Buscar nos logs…  Enter inclui · Shift+Enter exclui'}
                     aria-invalid={Boolean(searchPatternError)}
-                    title={searchPatternError ? `Expressão regular inválida: ${searchPatternError}` : undefined}
+                    title={
+                      searchPatternError
+                        ? looksLikeFieldFilter(searchTerm) ? searchPatternError : `Expressão regular inválida: ${searchPatternError}`
+                        : 'Texto ou expressão regular. Para filtrar por campo (JSON ou chave=valor): $campo = valor, $Elapsed > 1000, $RequestPath ~ /api'
+                    }
                     className={`h-8 w-full rounded-md border bg-slate-50 pl-9 pr-8 ${searchPatternError ? 'border-rose-400 dark:border-rose-700' : 'border-slate-200 dark:border-slate-700'} font-mono text-xs text-slate-900 placeholder:font-sans placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 disabled:opacity-50 dark:bg-slate-950 dark:text-slate-100 dark:focus:bg-slate-950`}
                   />
                   {searchTerm && (
@@ -1116,6 +1225,28 @@ export default function App() {
                   {enabledHighlightRules.length > 0 && (
                     <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">{enabledHighlightRules.length}</span>
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowTimeline((current) => !current)}
+                  aria-pressed={showTimeline}
+                  title="Mostrar ou esconder a linha do tempo (registros por período)"
+                  className={`${toolbarButtonClass} ${showTimeline ? activeButtonClass : neutralButtonClass}`}
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Linha do tempo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsErrorGroupsOpen(true)}
+                  disabled={entries.length === 0}
+                  title="Erros agrupados por mensagem, do mais frequente ao menos"
+                  className={`${toolbarButtonClass} ${neutralButtonClass}`}
+                >
+                  <ListOrdered className="h-3.5 w-3.5 text-rose-500" />
+                  <span className="hidden xl:inline">Top erros</span>
                 </button>
 
                 <button
@@ -1339,6 +1470,10 @@ export default function App() {
             </div>
           )}
 
+          {histogram && (
+            <TimelineHistogram histogram={histogram} timeFrom={timeFrom} timeTo={timeTo} onRangeChange={setTimeRange} />
+          )}
+
           <div className="relative flex min-h-0 flex-1 flex-col">
             {isLoading && (
               <div className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-sky-500/10">
@@ -1355,6 +1490,9 @@ export default function App() {
               sourceColors={sourceInfo.colorByLabel}
               emptyTitle={isLoading ? 'Carregando…' : emptyTitle}
               emptyDescription={isLoading ? `Processando ${selectedFiles.length} arquivo(s)…` : emptyDescription}
+              navigateTo={navigateTo}
+              bookmarkedKeys={bookmarkedKeys}
+              onToggleBookmark={toggleBookmark}
             />
           </div>
         </main>
@@ -1409,6 +1547,17 @@ export default function App() {
         onClose={() => setIsHighlightRulesModalOpen(false)}
       />
 
+      <ErrorGroupsPanel
+        isOpen={isErrorGroupsOpen}
+        entries={filteredEntries}
+        onFilterGroup={filterByGroup}
+        onShowEntry={(entry) => {
+          setIsErrorGroupsOpen(false);
+          setNavigateTo({ entryId: entry.id, nonce: Date.now() });
+        }}
+        onClose={() => setIsErrorGroupsOpen(false)}
+      />
+
       <SettingsModal
         isOpen={isSettingsOpen}
         isDarkMode={isDarkMode}
@@ -1419,6 +1568,10 @@ export default function App() {
         onToggleWordWrap={() => setWordWrap((current) => !current)}
         onFileSortFieldChange={setFileSortField}
         onSortDirectionChange={setSortDirection}
+        notifyErrors={notifyErrors}
+        notifyTerms={notifyTerms}
+        onNotifyErrorsChange={setNotifyErrors}
+        onNotifyTermsChange={setNotifyTerms}
         onClose={() => setIsSettingsOpen(false)}
       />
     </div>

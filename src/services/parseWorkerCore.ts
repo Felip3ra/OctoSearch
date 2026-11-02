@@ -18,6 +18,11 @@ export type ParseWorkerRequest =
 
 export type ParseWorkerResponse =
   | { type: 'progress'; requestId: number; progress: number }
+  /**
+   * Records parsed so far while a large file is still being read, so the UI can show them early.
+   * Same delta semantics as a result: entries before `fromIndex` are unchanged, the rest replace them.
+   */
+  | { type: 'partial'; requestId: number; fromIndex: number; entries: LogEntry[]; totalLines: number }
   | {
       type: 'result';
       requestId: number;
@@ -31,6 +36,14 @@ export type ParseWorkerResponse =
   /** The file cannot be continued incrementally and must be read again in full. */
   | { type: 'reset'; requestId: number }
   | { type: 'error'; requestId: number; message: string };
+
+export interface ParseWorkerOptions {
+  /** Time before the first partial result, and between the next ones (ms). */
+  firstPartialMs?: number;
+  partialIntervalMs?: number;
+  chunkSize?: number;
+  now?: () => number;
+}
 
 interface Session {
   parser: LogParseSession;
@@ -46,7 +59,10 @@ export class ParseWorkerCore {
   private sessions = new Map<string, Session>();
   private queue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly post: (response: ParseWorkerResponse) => void) {}
+  constructor(
+    private readonly post: (response: ParseWorkerResponse) => void,
+    private readonly options: ParseWorkerOptions = {}
+  ) {}
 
   /** Messages are handled one at a time, in order, even when one of them awaits (gzip). */
   handle(request: ParseWorkerRequest): Promise<void> {
@@ -79,15 +95,25 @@ export class ParseWorkerCore {
     const decoder = new TextDecoder(encoding);
     const parser = new LogParseSession({ referenceTime: request.referenceTime });
     const text = decoder.decode(body, { stream: true });
+    const { firstPartialMs = 300, partialIntervalMs = 500, chunkSize, now = Date.now } = this.options;
     let processed = 0;
     let lastProgress = -1;
-    for (const chunk of textChunks(text)) {
+    let nextPartialAt = now() + firstPartialMs;
+    for (const chunk of textChunks(text, chunkSize)) {
       parser.push(chunk);
       processed += chunk.length;
+      if (processed >= text.length) break;
       const progress = Math.min(99, Math.round((processed / text.length) * 100));
-      if (progress !== lastProgress && processed < text.length) {
+      if (progress !== lastProgress) {
         lastProgress = progress;
         this.post({ type: 'progress', requestId: request.requestId, progress });
+      }
+      // Partial results only for dated, recognized logs: time-only logs are anchored to a day
+      // when the file ends, and unrecognized ones are re-split line by line at the end.
+      if (parser.canAppend && now() >= nextPartialAt) {
+        nextPartialAt = now() + partialIntervalMs;
+        const { fromIndex, entries, totalLines } = parser.snapshot();
+        this.post({ type: 'partial', requestId: request.requestId, fromIndex, entries, totalLines });
       }
     }
 

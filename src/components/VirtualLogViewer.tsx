@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { HighlightRule, LogEntry, SearchPattern } from '../types';
 import { createAnyPatternMatcher } from '../services/logSearch';
-import { entryStackTrace, hasStackTrace } from '../services/logEntry';
+import { entryKey, entryStackTrace, hasStackTrace } from '../services/logEntry';
 import { sharedPrefixLength } from '../services/logView';
 import { LogEntryRow } from './LogEntryRow';
-import { SearchX, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
+import { SearchX, ArrowDown, ArrowUp, ChevronsUpDown, CornerDownLeft } from 'lucide-react';
 import { normalizeHighlightColor } from '../utils/highlightColor';
 
 interface VirtualLogViewerProps {
@@ -18,6 +18,15 @@ interface VirtualLogViewerProps {
   sourceColors?: Map<string, string>;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Scrolls to this record and makes it the active row (a new nonce repeats the request). */
+  navigateTo?: { entryId: number; nonce: number } | null;
+  bookmarkedKeys?: ReadonlySet<string>;
+  onToggleBookmark?: (entry: LogEntry) => void;
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  return Boolean(element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT' || element.isContentEditable));
 }
 
 const floatingButtonClass =
@@ -87,6 +96,9 @@ export function VirtualLogViewer({
   sourceColors,
   emptyTitle = 'Nenhum registro encontrado',
   emptyDescription = 'Nenhum registro corresponde aos filtros aplicados.',
+  navigateTo,
+  bookmarkedKeys,
+  onToggleBookmark,
 }: Readonly<VirtualLogViewerProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -94,6 +106,17 @@ export function VirtualLogViewer({
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [measuredHeights, setMeasuredHeights] = useState<Map<number, number>>(new Map());
   const prevCountRef = useRef(entries.length);
+  /** Row the keyboard shortcuts start from (last clicked or navigated to). */
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isGoToLineOpen, setIsGoToLineOpen] = useState(false);
+  const [goToLineValue, setGoToLineValue] = useState('');
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 2600);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   // Auto-expand items when searching inside their stack trace
   useEffect(() => {
@@ -207,10 +230,10 @@ export function VirtualLogViewer({
   }, [entries.length, autoScroll, scrollHeight]);
 
   // Binary search to find start index
-  const { startIndex, endIndex, offsetY } = useMemo(() => {
+  const { startIndex, endIndex, offsetY, firstVisibleIndex } = useMemo(() => {
     const count = entries.length;
     if (count === 0) {
-      return { startIndex: 0, endIndex: 0, offsetY: 0 };
+      return { startIndex: 0, endIndex: 0, offsetY: 0, firstVisibleIndex: 0 };
     }
 
     // Binary search for first item where position + height >= scrollTop
@@ -228,6 +251,7 @@ export function VirtualLogViewer({
       }
     }
 
+    const firstVisible = start;
     start = Math.max(0, start - OVERSCAN);
 
     // Find end index
@@ -243,6 +267,7 @@ export function VirtualLogViewer({
       endIndex: end,
       // Rows are placed relative to the real scroll position, so scaling never shows.
       offsetY: scrollTop + (positions[start] || 0) - virtualScrollTop,
+      firstVisibleIndex: firstVisible,
     };
   }, [entries.length, positions, scrollTop, virtualScrollTop, containerHeight]);
 
@@ -385,6 +410,96 @@ export function VirtualLogViewer({
     [highlightRules]
   );
 
+  /** Brings a row into view (a third from the top) and makes it the active one. */
+  const showIndex = useCallback(
+    (index: number) => {
+      const element = containerRef.current;
+      if (!element || index < 0 || index >= entries.length) return;
+      element.scrollTop = toScrollTop(Math.max(0, positions[index] - containerHeight / 3));
+      setActiveId(entries[index].id);
+    },
+    [entries, positions, containerHeight, toScrollTop]
+  );
+
+  useEffect(() => {
+    if (!navigateTo) return;
+    const index = entries.findIndex((entry) => entry.id === navigateTo.entryId);
+    if (index === -1) setNotice('Esse registro está oculto pelos filtros atuais.');
+    else showIndex(index);
+    // Only a new request navigates; later list updates keep the user's position.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigateTo]);
+
+  /** Next (or previous) row matching `predicate`, starting after the active/first visible row and wrapping around. */
+  const findFrom = useCallback(
+    (predicate: (entry: LogEntry) => boolean, direction: 1 | -1): { index: number; wrapped: boolean } | null => {
+      const count = entries.length;
+      if (count === 0) return null;
+      const activeIndex = activeId === null ? -1 : entries.findIndex((entry) => entry.id === activeId);
+      const origin = activeIndex !== -1 ? activeIndex : direction === 1 ? firstVisibleIndex - 1 : firstVisibleIndex;
+      for (let step = 1; step <= count; step++) {
+        const index = (((origin + step * direction) % count) + count) % count;
+        if (predicate(entries[index])) {
+          const wrapped = direction === 1 ? index <= origin : index >= origin;
+          return { index, wrapped };
+        }
+      }
+      return null;
+    },
+    [entries, activeId, firstVisibleIndex]
+  );
+
+  const jump = useCallback(
+    (predicate: (entry: LogEntry) => boolean, direction: 1 | -1, emptyMessage: string) => {
+      const found = findFrom(predicate, direction);
+      if (!found) {
+        setNotice(emptyMessage);
+        return;
+      }
+      showIndex(found.index);
+      if (found.wrapped) setNotice(direction === 1 ? 'Fim da lista: continuando do início.' : 'Início da lista: continuando do fim.');
+    },
+    [findFrom, showIndex]
+  );
+
+  const goToLine = (line: number) => {
+    const index = entries.findIndex((entry) => entry.startLine <= line && line <= entry.endLine);
+    if (index !== -1) {
+      showIndex(index);
+      setIsGoToLineOpen(false);
+      return;
+    }
+    const exists = allEntries.some((entry) => entry.startLine <= line && line <= entry.endLine);
+    setNotice(exists ? `A linha ${line} está oculta pelos filtros atuais.` : `A linha ${line} não está no trecho carregado.`);
+  };
+
+  // F8 / Shift+F8: next/previous error. F2 / Shift+F2: next/previous marked row.
+  // Ctrl+B: mark/unmark the active row. Ctrl+G: go to a line number.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const direction = event.shiftKey ? -1 : 1;
+      if (event.key === 'F8') {
+        event.preventDefault();
+        jump((entry) => entry.level === 'ERR', direction, 'Nenhum erro (ERR) nos registros visíveis.');
+      } else if (event.key === 'F2' && bookmarkedKeys) {
+        event.preventDefault();
+        jump((entry) => bookmarkedKeys.has(entryKey(entry)), direction, 'Nenhum registro marcado. Use Ctrl+B ou o ícone de alfinete para marcar.');
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') {
+        event.preventDefault();
+        setIsGoToLineOpen(true);
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b' && onToggleBookmark && !isTypingTarget(event.target)) {
+        event.preventDefault();
+        const active = entries.find((entry) => entry.id === activeId) ?? entries[firstVisibleIndex];
+        if (active) {
+          onToggleBookmark(active);
+          setActiveId(active.id);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [jump, bookmarkedKeys, onToggleBookmark, entries, activeId, firstVisibleIndex]);
+
   const scrollToTop = () => {
     if (containerRef.current) {
       containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -432,6 +547,41 @@ export function VirtualLogViewer({
         </button>
       </div>
 
+      {isGoToLineOpen && (
+        <form
+          className="absolute right-6 top-2 z-30 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white p-1.5 shadow-lg md:right-20 dark:border-slate-600 dark:bg-slate-800"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const line = Number.parseInt(goToLineValue, 10);
+            if (line > 0) goToLine(line);
+          }}
+        >
+          <label htmlFor="go-to-line" className="pl-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">Ir para a linha</label>
+          <input
+            id="go-to-line"
+            type="number"
+            min={1}
+            autoFocus
+            value={goToLineValue}
+            onChange={(event) => setGoToLineValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setIsGoToLineOpen(false);
+            }}
+            onBlur={() => setIsGoToLineOpen(false)}
+            className="h-7 w-24 rounded border border-slate-300 bg-white px-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-900"
+          />
+          <button type="submit" className="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Ir">
+            <CornerDownLeft className="h-3.5 w-3.5" />
+          </button>
+        </form>
+      )}
+
+      {notice && (
+        <div role="status" className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-slate-900/90 px-3 py-1.5 text-xs text-white shadow-lg dark:bg-slate-100/90 dark:text-slate-900">
+          {notice}
+        </div>
+      )}
+
       <div className="flex flex-1 min-h-0 min-w-0">
         {/* Main Virtualized Scroll Container */}
         <div
@@ -464,6 +614,10 @@ export function VirtualLogViewer({
                   wordWrap={wordWrap}
                   sourceColor={entry.sourceFile ? sourceColors?.get(entry.sourceFile) : undefined}
                   onHeightChange={wordWrap ? handleHeightChange : undefined}
+                  isActive={entry.id === activeId}
+                  isBookmarked={bookmarkedKeys?.has(entryKey(entry)) ?? false}
+                  onActivate={setActiveId}
+                  onToggleBookmark={onToggleBookmark}
                 />
               ))}
             </div>

@@ -15,6 +15,11 @@ export interface DraftEntry {
   stackTrace: string[];
 }
 
+/** Identifies a record across updates of the timeline (bookmarks, notifications). */
+export function entryKey(entry: LogEntry): string {
+  return `${entry.sourceFile ?? ''}:${entry.startLine}`;
+}
+
 export function entryTimestamp(entry: LogEntry): string {
   return entry.timestamp ?? entry.rawText.slice(entry.timestampStart, entry.timestampEnd);
 }

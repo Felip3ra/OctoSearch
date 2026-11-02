@@ -11,6 +11,11 @@ export const booleanCodec: PersistedStateCodec<boolean> = {
   serialize: String,
 };
 
+export const stringCodec: PersistedStateCodec<string> = {
+  parse: (raw) => raw,
+  serialize: (value) => value,
+};
+
 export function enumCodec<T extends string>(allowed: readonly T[]): PersistedStateCodec<T> {
   return {
     parse: (raw) => (allowed.includes(raw as T) ? (raw as T) : undefined),

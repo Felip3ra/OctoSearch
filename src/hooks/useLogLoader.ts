@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileReadResult, LogEntry, LogFileItem } from '../types';
 import { appendInWorker, disposeWorkerSessions, parseInWorker } from '../services/parserClient';
 import { isGzipFileName, LogEncoding } from '../services/logDecoding';
-import { mergeLogSources } from '../services/logMerge';
+import { IncrementalMerger } from '../services/logMerge';
 import { buildSourceLabels, isNativeFile } from '../utils/logFile';
 import { describeReadError } from '../utils/folderAccess';
 
@@ -48,13 +48,19 @@ async function readLogBytes(file: LogFileItem): Promise<FileReadResult> {
   throw new Error(`Conteúdo do arquivo "${file.name}" não disponível.`);
 }
 
-async function parseWholeFile(file: LogFileItem, onProgress?: (progress: number) => void): Promise<ParsedFile> {
+async function parseWholeFile(
+  file: LogFileItem,
+  onProgress?: (progress: number) => void,
+  onPartial?: (partial: ParsedFile) => void
+): Promise<ParsedFile> {
   const read = await readLogBytes(file);
+  const truncated = read.start > 0;
   const result = await parseInWorker(
     file.id,
     read.bytes,
-    { gzip: isGzipFileName(file.name), truncated: read.start > 0, referenceTime: read.mtimeMs || file.lastModified },
-    onProgress
+    { gzip: isGzipFileName(file.name), truncated, referenceTime: read.mtimeMs || file.lastModified },
+    onProgress,
+    onPartial && ((entries) => onPartial({ ...FAILED_FILE, entries, totalLines: 0, truncated }))
   );
   return {
     entries: result.entries,
@@ -107,6 +113,7 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
   const parsedFilesRef = useRef(new Map<string, ParsedFile>());
   const loadRequestRef = useRef(0);
+  const mergerRef = useRef(new IncrementalMerger());
 
   /** Rebuilds the visible timeline from the per-file parse cache. */
   const applyParsedFiles = useCallback((files: LogFileItem[], parsed: Map<string, ParsedFile>) => {
@@ -115,7 +122,7 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
       const result = parsed.get(file.id);
       return result ? [{ label: labels.get(file.id) || file.name, entries: result.entries }] : [];
     });
-    setEntries(mergeLogSources(sources));
+    setEntries(mergerRef.current.merge(sources));
     setTotalLines(files.reduce((total, file) => total + (parsed.get(file.id)?.totalLines || 0), 0));
     setUnrecognizedFiles(files.filter((file) => parsed.get(file.id)?.formatRecognized === false).map((file) => file.name));
     setTruncatedFiles(files.filter((file) => parsed.get(file.id)?.truncated).map((file) => file.name));
@@ -144,9 +151,19 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
             continue;
           }
           try {
-            const result = await parseWholeFile(file, (progress) => {
-              if (isCurrent()) setLoadingProgress(Math.round(progressBase + (progress * progressSpan) / 100));
-            });
+            const result = await parseWholeFile(
+              file,
+              (progress) => {
+                if (isCurrent()) setLoadingProgress(Math.round(progressBase + (progress * progressSpan) / 100));
+              },
+              // Large files show the records parsed so far while the rest is still being read.
+              (partial) => {
+                if (!isCurrent()) return;
+                const shown = new Map(parsed);
+                shown.set(file.id, partial);
+                applyParsedFiles(files.filter((item) => shown.has(item.id)), shown);
+              }
+            );
             if (!isCurrent()) return;
             parsed.set(file.id, result);
           } catch (err: unknown) {
@@ -182,6 +199,8 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
       loadRequestRef.current++;
       disposeWorkerSessions([...parsedFilesRef.current.keys()]);
       parsedFilesRef.current = new Map();
+      // Drop the merged copies too, or a closed selection would stay in memory.
+      mergerRef.current = new IncrementalMerger();
       setEntries([]);
       setTotalLines(0);
       setErrorMessage(null);

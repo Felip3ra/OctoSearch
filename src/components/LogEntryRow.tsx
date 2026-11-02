@@ -3,7 +3,7 @@ import { LogEntry, EntryLogLevel, HighlightRule, SearchPattern } from '../types'
 import { createAnyPatternMatcher, splitTextWithHighlights } from '../services/logSearch';
 import { entryMessage, entryStackTrace, entryTimestamp, hasStackTrace } from '../services/logEntry';
 import { highlightColorWithAlpha, normalizeHighlightColor } from '../utils/highlightColor';
-import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Check, Pin } from 'lucide-react';
 
 interface LogEntryRowProps {
   entry: LogEntry;
@@ -14,6 +14,11 @@ interface LogEntryRowProps {
   wordWrap?: boolean;
   sourceColor?: string;
   onHeightChange?: (id: number, height: number) => void;
+  /** The row the keyboard shortcuts act on (last clicked or navigated to). */
+  isActive?: boolean;
+  isBookmarked?: boolean;
+  onActivate?: (id: number) => void;
+  onToggleBookmark?: (entry: LogEntry) => void;
 }
 
 const LEVEL_STYLES: Record<EntryLogLevel, { badge: string; text: string; rowBg: string }> = {
@@ -154,7 +159,9 @@ interface EntryContextMenuProps {
   entry: LogEntry;
   position: { x: number; y: number };
   isExpanded: boolean;
+  isBookmarked: boolean;
   onToggle: () => void;
+  onToggleBookmark?: () => void;
   onClose: () => void;
 }
 
@@ -162,7 +169,9 @@ function EntryContextMenu({
   entry,
   position,
   isExpanded,
+  isBookmarked,
   onToggle,
+  onToggleBookmark,
   onClose,
 }: Readonly<EntryContextMenuProps>) {
   const copyAndClose = (text: string) => {
@@ -189,6 +198,11 @@ function EntryContextMenu({
       <button type="button" role="menuitem" onClick={() => copyAndClose(entryTimestamp(entry))} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
         <Copy className="h-3.5 w-3.5" /> Copiar data e hora
       </button>
+      {onToggleBookmark && (
+        <button type="button" role="menuitem" onClick={() => { onToggleBookmark(); onClose(); }} className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-800">
+          <Pin className="h-3.5 w-3.5" /> {isBookmarked ? 'Desmarcar registro' : 'Marcar registro'} <kbd className="ml-auto font-mono text-[10px] text-slate-400">Ctrl+B</kbd>
+        </button>
+      )}
       {hasStackTrace(entry) && (
         <button type="button" role="menuitem" onClick={() => { onToggle(); onClose(); }} className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-800">
           {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -208,8 +222,10 @@ interface PrimaryLogLineProps {
   styles: (typeof LEVEL_STYLES)[EntryLogLevel];
   sourceColor?: string;
   copied: boolean;
+  isBookmarked: boolean;
   onToggle: (event?: React.MouseEvent) => void;
   onCopy: (event: React.MouseEvent) => void;
+  onToggleBookmark?: (event: React.MouseEvent) => void;
 }
 
 function PrimaryLogLine({
@@ -221,8 +237,10 @@ function PrimaryLogLine({
   styles,
   sourceColor,
   copied,
+  isBookmarked,
   onToggle,
   onCopy,
+  onToggleBookmark,
 }: Readonly<PrimaryLogLineProps>) {
   const widthClass = wordWrap ? 'w-full' : 'w-max';
   const timestamp = entryTimestamp(entry);
@@ -240,9 +258,10 @@ function PrimaryLogLine({
   return (
     <div className={`flex items-start px-2 py-1.5 gap-2 select-text min-w-full ${widthClass}`}>
       <span
-        className={`w-14 shrink-0 text-right select-none pr-1 ${lineNumberClass}`}
+        className={`flex w-14 shrink-0 items-center justify-end gap-1 text-right select-none pr-1 ${lineNumberClass}`}
         style={highlightColor ? { color: highlightColor } : undefined}
       >
+        {isBookmarked && <Pin className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label="Registro marcado" />}
         {entry.startLine}
       </span>
 
@@ -296,6 +315,17 @@ function PrimaryLogLine({
         )}
       </div>
 
+      {onToggleBookmark && (
+        <button
+          type="button"
+          onClick={onToggleBookmark}
+          title={isBookmarked ? 'Desmarcar registro (Ctrl+B)' : 'Marcar registro (Ctrl+B); F2 vai para o próximo marcado'}
+          className={`shrink-0 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-opacity ${isBookmarked ? 'text-amber-500 opacity-100' : 'text-slate-500 opacity-0 group-hover:opacity-100'}`}
+        >
+          <Pin className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-400' : ''}`} />
+        </button>
+      )}
+
       <button
         type="button"
         onClick={onCopy}
@@ -321,6 +351,10 @@ export const LogEntryRow = memo(function LogEntryRow({
   wordWrap = false,
   sourceColor,
   onHeightChange,
+  isActive = false,
+  isBookmarked = false,
+  onActivate,
+  onToggleBookmark,
 }: LogEntryRowProps) {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -392,9 +426,10 @@ export const LogEntryRow = memo(function LogEntryRow({
           y: Math.min(event.clientY, window.innerHeight - 175),
         });
       }}
+      onClick={() => onActivate?.(entry.id)}
       title={highlightRule ? `Marcador: contém “${highlightRule.text}”` : undefined}
       style={highlightStyle}
-      className={`border-b text-xs font-mono transition-colors group ${rowAppearanceClass}`}
+      className={`border-b text-xs font-mono transition-colors group ${rowAppearanceClass} ${isActive ? 'outline outline-2 -outline-offset-2 outline-sky-500/70' : ''}`}
     >
       <PrimaryLogLine
         entry={entry}
@@ -405,8 +440,10 @@ export const LogEntryRow = memo(function LogEntryRow({
         styles={styles}
         sourceColor={sourceColor}
         copied={copied}
+        isBookmarked={isBookmarked}
         onToggle={handleToggle}
         onCopy={handleCopy}
+        onToggleBookmark={onToggleBookmark ? (event) => { event.stopPropagation(); onToggleBookmark(entry); } : undefined}
       />
 
       {hasStackTrace(entry) && isExpanded && (
@@ -418,7 +455,9 @@ export const LogEntryRow = memo(function LogEntryRow({
           entry={entry}
           position={contextMenu}
           isExpanded={isExpanded}
+          isBookmarked={isBookmarked}
           onToggle={handleToggle}
+          onToggleBookmark={onToggleBookmark ? () => onToggleBookmark(entry) : undefined}
           onClose={() => setContextMenu(null)}
         />
       )}

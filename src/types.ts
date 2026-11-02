@@ -145,7 +145,14 @@ export interface FileReadResult {
   mtimeMs: number;
 }
 
-type NativeLogFile = { name: string; path: string; relativePath?: string; size: number; createdAt?: number; lastModified: number };
+export interface LaunchPath {
+  path: string;
+  /** Folder to open: the path itself for a folder, its parent for a file (already granted). */
+  folder: string;
+  isDirectory: boolean;
+}
+
+type NativeLogFile ={ name: string; path: string; relativePath?: string; size: number; createdAt?: number; lastModified: number };
 
 export interface ElectronAPI {
   isElectron: boolean;
@@ -161,6 +168,10 @@ export interface ElectronAPI {
   watchFiles?: (filePaths: string[]) => Promise<string[]>;
   onFileChanged?: (callback: (filePath: string) => void) => () => void;
   saveTextFile?: (options: { defaultName: string; content: string }) => Promise<string | null>;
+  notify?: (options: { title: string; body: string }) => Promise<boolean>;
+  /** Files/folders the app was asked to open (double click, "Open with", command line). */
+  takeLaunchPaths?: () => Promise<LaunchPath[]>;
+  onOpenPaths?: (callback: (paths: LaunchPath[]) => void) => () => void;
   openInExplorer?: (targetPath: string) => Promise<void>;
 }
 

@@ -18,5 +18,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('fs:fileChanged', listener);
   },
   saveTextFile: (options) => ipcRenderer.invoke('dialog:saveTextFile', options),
+  notify: (options) => ipcRenderer.invoke('app:notify', options),
+  takeLaunchPaths: () => ipcRenderer.invoke('app:takeLaunchPaths'),
+  onOpenPaths: (callback) => {
+    const listener = (event, paths) => callback(paths);
+    ipcRenderer.on('app:openPaths', listener);
+    return () => ipcRenderer.removeListener('app:openPaths', listener);
+  },
   openInExplorer: (targetPath) => ipcRenderer.invoke('shell:showItemInFolder', targetPath),
 });

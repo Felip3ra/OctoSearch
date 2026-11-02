@@ -2,6 +2,7 @@ import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { ParseWorkerCore, ParseWorkerResponse } from './parseWorkerCore';
 import { entryMessage } from './logEntry';
+import { LogEntry } from '../types';
 
 function createCore() {
   const responses: ParseWorkerResponse[] = [];
@@ -71,6 +72,23 @@ describe('ParseWorkerCore', () => {
     await core.handle(parseRequest('cortado] fim\n2026-10-06 10:00:00 [INF] inteiro\n', { truncated: true }));
     const truncated = last();
     expect(truncated.type === 'result' && truncated.entries.map(entryMessage)).toEqual(['inteiro']);
+  });
+
+  it('sends partial results while a long file is parsed, and the final delta continues them', async () => {
+    const responses: ParseWorkerResponse[] = [];
+    const core = new ParseWorkerCore((response) => responses.push(response), { firstPartialMs: 0, partialIntervalMs: 0, chunkSize: 40 });
+    const lines = Array.from({ length: 6 }, (_, index) => `2026-10-06 10:00:0${index} [INF] registro ${index}`);
+    await core.handle(parseRequest(`${lines.join('\n')}\n`));
+
+    const partials = responses.filter((response) => response.type === 'partial');
+    expect(partials.length).toBeGreaterThan(1);
+    let timeline: LogEntry[] = [];
+    for (const response of responses) {
+      if (response.type === 'partial' || response.type === 'result') {
+        timeline = [...timeline.slice(0, response.fromIndex), ...response.entries];
+      }
+    }
+    expect(timeline.map(entryMessage)).toEqual(lines.map((_, index) => `registro ${index}`));
   });
 
   it('reports errors instead of throwing', async () => {

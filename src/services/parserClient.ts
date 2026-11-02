@@ -16,6 +16,16 @@ interface Pending {
   resolve: (result: WorkerParseResult | null) => void;
   reject: (error: Error) => void;
   onProgress?: (progress: number) => void;
+  onPartial?: (entries: LogEntry[]) => void;
+  /** Records received in partial results; the final result continues this timeline. */
+  received?: LogEntry[];
+}
+
+/** Applies a delta (unchanged records before `fromIndex`) with a single copy of the kept part. */
+function applyDelta(current: LogEntry[], fromIndex: number, entries: LogEntry[]): LogEntry[] {
+  const next = current.slice(0, fromIndex);
+  for (const entry of entries) next.push(entry);
+  return next;
 }
 
 let worker: Worker | null = null;
@@ -49,12 +59,22 @@ function getWorker(): Worker {
       request.onProgress?.(response.progress);
       return;
     }
+    if (response.type === 'partial') {
+      shareLevelStrings(response.entries);
+      request.received = applyDelta(request.received ?? [], response.fromIndex, response.entries);
+      request.onPartial?.(request.received);
+      return;
+    }
     pending.delete(response.requestId);
     if (response.type === 'error') request.reject(new Error(response.message));
     else if (response.type === 'reset') request.resolve(null);
     else {
       const { type: _type, requestId: _requestId, ...result } = response;
       shareLevelStrings(result.entries);
+      if (request.received) {
+        result.entries = applyDelta(request.received, result.fromIndex, result.entries);
+        result.fromIndex = 0;
+      }
       request.resolve(result);
     }
   };
@@ -80,23 +100,26 @@ type WithoutRequestId<T> = T extends unknown ? Omit<T, 'requestId'> : never;
 
 function send(
   request: WithoutRequestId<Exclude<ParseWorkerRequest, { type: 'dispose' }>>,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  onPartial?: (entries: LogEntry[]) => void
 ): Promise<WorkerParseResult | null> {
   const requestId = nextRequestId++;
   const message = { ...request, requestId } as ParseWorkerRequest & { requestId: number; bytes: ArrayBuffer };
   return new Promise((resolve, reject) => {
-    pending.set(requestId, { resolve, reject, onProgress });
+    pending.set(requestId, { resolve, reject, onProgress, onPartial });
     getWorker().postMessage(message, [message.bytes]);
   });
 }
 
+/** Parses a whole file; `onPartial` receives the records parsed so far while a large file is read. */
 export function parseInWorker(
   key: string,
   bytes: Uint8Array,
   options: { gzip: boolean; truncated: boolean; referenceTime: number },
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  onPartial?: (entries: LogEntry[]) => void
 ): Promise<WorkerParseResult> {
-  return send({ type: 'parse', key, bytes: toTransferable(bytes), ...options }, onProgress) as Promise<WorkerParseResult>;
+  return send({ type: 'parse', key, bytes: toTransferable(bytes), ...options }, onProgress, onPartial) as Promise<WorkerParseResult>;
 }
 
 /** Continues a parsed file with the bytes appended to it; null means it must be parsed again in full. */

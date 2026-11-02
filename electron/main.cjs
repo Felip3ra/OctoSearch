@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell, session } = require('electron');
+const { app, BrowserWindow, Menu, Notification, ipcMain, dialog, shell, session } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { AllowedFolders, isSupportedLogFileName } = require('./folderAccess.cjs');
+const { isZipFileName, joinZipPath, splitZipPath, listZipEntries, readZipEntry } = require('./zipReader.cjs');
 
 let mainWindow = null;
 let allowedFolders = null;
@@ -45,10 +46,33 @@ async function scanDirectoryForLogs(folderPath) {
 
     const subdirectories = [];
     const logFiles = [];
+    const zipFiles = [];
     for (const entry of entries) {
       const fullPath = path.join(currentPath, entry.name);
       if (entry.isDirectory()) subdirectories.push(fullPath);
       else if (entry.isFile() && isSupportedLogFileName(entry.name)) logFiles.push({ name: entry.name, fullPath });
+      else if (entry.isFile() && isZipFileName(entry.name)) zipFiles.push(fullPath);
+    }
+
+    // Logs inside .zip files are listed as if the archive were a subfolder.
+    for (const zipPath of zipFiles) {
+      try {
+        const zipStat = await fs.promises.stat(zipPath);
+        for (const item of await listZipEntries(zipPath)) {
+          const name = path.posix.basename(item.name);
+          if (!isSupportedLogFileName(name) || results.length >= MAX_LOG_FILES) continue;
+          results.push({
+            name,
+            path: joinZipPath(zipPath, item.name),
+            relativePath: `${path.relative(folderPath, zipPath)}/${item.name}`,
+            size: item.uncompressedSize,
+            createdAt: item.lastModified,
+            lastModified: item.lastModified || zipStat.mtimeMs,
+          });
+        }
+      } catch (zipError) {
+        console.warn('Erro ao ler o .zip:', zipPath, zipError?.message || zipError);
+      }
     }
 
     const stats = await Promise.all(
@@ -130,19 +154,25 @@ async function requestFolderAccess(folderPath) {
   return realFolder;
 }
 
-/** Resolves a log file path and makes sure it is a supported log inside an allowed folder. */
+/**
+ * Resolves a log file path and makes sure it is a supported log inside an allowed folder.
+ * For a log inside a zip ("<zip>::<name>") `realFile` is the zip and `innerName` the log inside it.
+ */
 async function resolveAllowedLogFile(filePath) {
   assertString(filePath, 'filePath');
-  if (!isSupportedLogFileName(path.basename(filePath))) throw new Error(`Tipo de arquivo não permitido: ${filePath}`);
+  const inZip = splitZipPath(filePath);
+  const diskPath = inZip ? inZip.zipPath : filePath;
+  const logName = inZip ? path.posix.basename(inZip.innerName) : path.basename(filePath);
+  if (!isSupportedLogFileName(logName)) throw new Error(`Tipo de arquivo não permitido: ${filePath}`);
   let realFile;
   try {
-    realFile = await fs.promises.realpath(filePath);
+    realFile = await fs.promises.realpath(diskPath);
   } catch (error) {
     if (error?.code === 'ENOENT') throw new Error(`Arquivo não encontrado: ${filePath}`, { cause: error });
     throw error;
   }
   if (!allowedFolders.has(realFile)) throw new Error(`Arquivo fora das pastas liberadas: ${filePath}`);
-  return realFile;
+  return { realFile, innerName: inZip ? inZip.innerName : null };
 }
 
 async function readRange(filePath, start, end) {
@@ -220,7 +250,12 @@ function createWindow() {
     },
   });
 
-  Menu.setApplicationMenu(null);
+  // No macOS os atalhos de copiar/colar (Cmd+C/V) e de sair dependem do menu da aplicação.
+  Menu.setApplicationMenu(
+    process.platform === 'darwin'
+      ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }])
+      : null
+  );
 
   let indexPath = path.join(__dirname, '../dist/index.html');
   if (!fs.existsSync(indexPath)) {
@@ -237,6 +272,7 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     closeWatchers();
+    rendererReady = false;
     mainWindow = null;
   });
 
@@ -328,8 +364,14 @@ ipcMain.handle('fs:readFolder', async (event, folderPath) => {
 // Arquivos enormes são lidos só pelo final.
 ipcMain.handle('fs:readFile', async (event, filePath) => {
   assertTrustedSender(event);
-  const realFile = await resolveAllowedLogFile(filePath);
+  const { realFile, innerName } = await resolveAllowedLogFile(filePath);
   const stat = await fs.promises.stat(realFile);
+  if (innerName) {
+    // Logs inside a zip are decompressed in memory; `size` is the zip's, so a changed zip is read again.
+    const content = await readZipEntry(realFile, innerName);
+    const start = !/\.gz$/i.test(innerName) && content.length > MAX_INITIAL_READ_BYTES ? content.length - MAX_INITIAL_READ_BYTES : 0;
+    return { bytes: content.subarray(start), start, size: stat.size, mtimeMs: stat.mtimeMs };
+  }
   const isGzip = /\.gz$/i.test(realFile);
   const start = !isGzip && stat.size > MAX_INITIAL_READ_BYTES ? stat.size - MAX_INITIAL_READ_BYTES : 0;
   const bytes = await readRange(realFile, start, stat.size);
@@ -341,7 +383,8 @@ ipcMain.handle('fs:readFile', async (event, filePath) => {
 ipcMain.handle('fs:readFileFrom', async (event, filePath, offset) => {
   assertTrustedSender(event);
   if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('Parâmetro inválido: offset');
-  const realFile = await resolveAllowedLogFile(filePath);
+  const { realFile, innerName } = await resolveAllowedLogFile(filePath);
+  if (innerName) return null;
   const stat = await fs.promises.stat(realFile);
   if (stat.size < offset || stat.size - offset > MAX_APPEND_READ_BYTES) return null;
   const bytes = await readRange(realFile, offset, stat.size);
@@ -352,7 +395,7 @@ ipcMain.handle('fs:readFileFrom', async (event, filePath, offset) => {
 ipcMain.handle('fs:checkFileStats', async (event, filePath) => {
   assertTrustedSender(event);
   try {
-    const realFile = await resolveAllowedLogFile(filePath);
+    const { realFile } = await resolveAllowedLogFile(filePath);
     const stat = await fs.promises.stat(realFile);
     return {
       size: stat.size,
@@ -371,7 +414,7 @@ ipcMain.handle('fs:watchFiles', async (event, filePaths) => {
   const watched = [];
   for (const filePath of filePaths.slice(0, 200)) {
     try {
-      const realFile = await resolveAllowedLogFile(filePath);
+      const { realFile } = await resolveAllowedLogFile(filePath);
       if (watchFile(filePath, realFile)) watched.push(filePath);
     } catch {
       // Arquivo removido ou fora das pastas liberadas: fica só com a verificação periódica.
@@ -403,13 +446,109 @@ ipcMain.handle('dialog:saveTextFile', async (event, options) => {
 ipcMain.handle('shell:showItemInFolder', async (event, targetPath) => {
   assertTrustedSender(event);
   assertString(targetPath, 'targetPath');
-  const realTarget = await realPathOrSelf(targetPath);
+  // A log inside a zip is shown as the zip itself.
+  const realTarget = await realPathOrSelf(splitZipPath(targetPath)?.zipPath ?? targetPath);
   if (!allowedFolders.has(realTarget)) return;
   if (fs.existsSync(realTarget)) {
     shell.showItemInFolder(realTarget);
   } else {
     await shell.openPath(path.dirname(realTarget));
   }
+});
+
+// Notificação do sistema (tempo real): a tela pede, o processo principal mostra.
+// Clicar nela traz a janela para a frente.
+ipcMain.handle('app:notify', async (event, options) => {
+  assertTrustedSender(event);
+  if (!Notification.isSupported()) return false;
+  const title = typeof options?.title === 'string' ? options.title.slice(0, 120) : 'OctoSearch';
+  const body = typeof options?.body === 'string' ? options.body.slice(0, 300) : '';
+  const notification = new Notification({ title, body, icon: path.join(__dirname, 'icon.png') });
+  notification.on('click', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  notification.show();
+  return true;
+});
+
+// ---------------------------------------------------------------------------------------------
+// Abrir pelo sistema: duplo clique num .log (associação de arquivos), "Abrir com", arrastar para o ícone
+// ou a linha de comando (octosearch caminho/do/arquivo.log). A pasta do arquivo passa a ser liberada,
+// porque foi o próprio usuário que pediu para abri-lo.
+// ---------------------------------------------------------------------------------------------
+
+let pendingLaunchPaths = [];
+/** True once the window asked for the pending paths (before that they are queued). */
+let rendererReady = false;
+
+function launchPathsFrom(argv) {
+  // No app empacotado argv[0] é o executável; no desenvolvimento, argv[1] é a pasta do projeto.
+  const args = argv.slice(app.isPackaged ? 1 : 2);
+  return args.filter((arg) => typeof arg === 'string' && arg && !arg.startsWith('-')).slice(0, 20);
+}
+
+async function prepareLaunchPaths(paths) {
+  const opened = [];
+  for (const candidate of paths) {
+    try {
+      const resolved = path.resolve(candidate);
+      const stat = await fs.promises.stat(resolved);
+      const isDirectory = stat.isDirectory();
+      if (!isDirectory && !isSupportedLogFileName(path.basename(resolved))) continue;
+      const folder = isDirectory ? resolved : path.dirname(resolved);
+      allowedFolders.add(await realPathOrSelf(folder));
+      opened.push({ path: resolved, folder, isDirectory });
+    } catch {
+      // Caminho inexistente: ignorado.
+    }
+  }
+  return opened;
+}
+
+async function openLaunchPaths(paths) {
+  const prepared = await prepareLaunchPaths(paths);
+  if (prepared.length === 0) return;
+  if (mainWindow && !mainWindow.isDestroyed() && rendererReady) {
+    mainWindow.webContents.send('app:openPaths', prepared);
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  } else {
+    pendingLaunchPaths.push(...prepared);
+  }
+}
+
+// A tela pede os caminhos recebidos antes de ela terminar de carregar (abertura pelo duplo clique).
+ipcMain.handle('app:takeLaunchPaths', async (event) => {
+  assertTrustedSender(event);
+  rendererReady = true;
+  const paths = pendingLaunchPaths;
+  pendingLaunchPaths = [];
+  return paths;
+});
+
+// Uma segunda execução (duplo clique com o app aberto) entrega os caminhos à janela que já existe.
+const isPrimaryInstance = app.requestSingleInstanceLock();
+if (!isPrimaryInstance) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, argv) => {
+    void openLaunchPaths(launchPathsFrom(argv));
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
+// macOS entrega os arquivos por evento (inclusive antes de o app ficar pronto).
+const macOpenFiles = [];
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  if (allowedFolders) void openLaunchPaths([filePath]);
+  else macOpenFiles.push(filePath);
 });
 
 // Atualização automática via GitHub Releases (configurado em "build.publish" no package.json).
@@ -460,12 +599,17 @@ function setupAutoUpdates() {
 }
 
 app.whenReady().then(() => {
+  if (!isPrimaryInstance) return;
+  // Sem isso as notificações do Windows aparecem com o nome "electron.app.OctoSearch".
+  if (process.platform === 'win32') app.setAppUserModelId('com.octosearch.desktop');
   allowedFolders = new AllowedFolders(path.join(app.getPath('userData'), 'allowed-folders.json'));
-  // O app não usa câmera, microfone, notificações etc.: só a cópia para a área de transferência é permitida.
+  // O app não usa câmera, microfone etc.: só a cópia para a área de transferência é permitida.
+  // (As notificações são mostradas pelo processo principal, sem permissão da tela.)
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) =>
     callback(permission === 'clipboard-sanitized-write')
   );
   createWindow();
+  void openLaunchPaths([...launchPathsFrom(process.argv), ...macOpenFiles.splice(0)]);
   setupAutoUpdates();
 });
 

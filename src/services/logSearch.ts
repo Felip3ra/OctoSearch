@@ -1,5 +1,6 @@
 import { FilterOperator, LogEntry, LogLevel, SearchFilter, SearchMode, SearchPattern } from '../types';
 import { entrySearchText } from './logEntry';
+import { createFieldMatcher, entryFields, looksLikeFieldFilter, parseFieldFilter } from './logFields';
 
 export interface FilterOptions {
   searchTerm: string;
@@ -18,6 +19,9 @@ export interface FilterOptions {
 
 /** Returns the error message of an invalid regular expression, or null when the pattern is usable. */
 export function getPatternError(pattern: SearchPattern): string | null {
+  if (looksLikeFieldFilter(pattern.text)) {
+    return parseFieldFilter(pattern.text) ? null : 'Filtro por campo: use $campo operador valor, por exemplo $UserId = 81 ou $Elapsed > 1000.';
+  }
   if (!pattern.regex) return null;
   try {
     RegExp(pattern.text);
@@ -107,7 +111,19 @@ export function createEntryFilter(options: FilterOptions): ((entry: LogEntry) =>
   const hasTimeRange = timeFrom !== undefined || timeTo !== undefined;
   if (level === 'ALL' && !hasTimeRange && normalizedFilters.length === 0) return null;
 
-  const matchers = new Map(normalizedFilters.map((filter) => [filter.id, createPatternMatcher(filter)]));
+  // Text terms look at the record's text; `$field op value` terms at its fields, read once per record.
+  type TermMatcher = (text: string, lowerText: string, fields: () => Map<string, string>) => boolean;
+  const matchers = new Map<string, TermMatcher>(
+    normalizedFilters.map((filter): [string, TermMatcher] => {
+      if (looksLikeFieldFilter(filter.text)) {
+        const field = parseFieldFilter(filter.text);
+        const matchesField = field ? createFieldMatcher(field) : () => false;
+        return [filter.id, (_text, _lower, fields) => matchesField(fields())];
+      }
+      const matchesText = createPatternMatcher(filter);
+      return [filter.id, (text, lowerText) => matchesText(text, lowerText)];
+    })
+  );
   const includeBlocks = getIncludeBlocks(normalizedFilters, includeOperator);
   const excludeTerms = normalizedFilters.filter((filter) => filter.mode === 'exclude');
 
@@ -131,10 +147,12 @@ export function createEntryFilter(options: FilterOptions): ((entry: LogEntry) =>
 
     const searchableText = entrySearchText(entry);
     const lowerText = searchableText.toLowerCase();
+    let fieldCache: Map<string, string> | undefined;
+    const fields = () => (fieldCache ??= entryFields(entry));
 
     // A record matches when every term of at least one block is present (AND inside, OR between blocks).
     // Exclusions hide a record when any of them is present.
-    const containsTerm = (filter: SearchFilter) => matchers.get(filter.id)!(searchableText, lowerText);
+    const containsTerm = (filter: SearchFilter) => matchers.get(filter.id)!(searchableText, lowerText, fields);
     const matchesInclusions =
       includeBlocks.length === 0 || includeBlocks.some((block) => block.every(containsTerm));
     const matchesAnyExclusion = excludeTerms.some(containsTerm);
