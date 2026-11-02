@@ -22,6 +22,22 @@ let worker: Worker | null = null;
 let nextRequestId = 1;
 const pending = new Map<number, Pending>();
 
+/**
+ * Strings arrive from the worker as separate copies; the few distinct levels are shared by all
+ * records instead (millions of "INF"s are tens of MB).
+ */
+const sharedLevels = new Map<string, string>();
+function shareLevelStrings(entries: LogEntry[]): void {
+  for (const entry of entries) {
+    let level = sharedLevels.get(entry.level);
+    if (level === undefined) sharedLevels.set(entry.level, (level = entry.level));
+    entry.level = level as LogEntry['level'];
+    let rawLevel = sharedLevels.get(entry.rawLevel);
+    if (rawLevel === undefined) sharedLevels.set(entry.rawLevel, (rawLevel = entry.rawLevel));
+    entry.rawLevel = rawLevel;
+  }
+}
+
 function getWorker(): Worker {
   if (worker) return worker;
   worker = new ParserWorker();
@@ -38,6 +54,7 @@ function getWorker(): Worker {
     else if (response.type === 'reset') request.resolve(null);
     else {
       const { type: _type, requestId: _requestId, ...result } = response;
+      shareLevelStrings(result.entries);
       request.resolve(result);
     }
   };

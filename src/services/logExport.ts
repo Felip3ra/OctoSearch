@@ -1,4 +1,5 @@
 import { LogEntry } from '../types';
+import { entryMessage, entryStackTrace, entryTimestamp } from './logEntry';
 
 export type ExportFormat = 'log' | 'csv';
 
@@ -22,10 +23,10 @@ export function buildCsv(entries: LogEntry[], includeSource: boolean): string {
   const rows = entries.map((entry) => [
     ...(includeSource ? [entry.sourceFile || ''] : []),
     String(entry.startLine),
-    entry.timestamp,
+    entryTimestamp(entry),
     entry.rawLevel || entry.level,
-    entry.message,
-    entry.stackTrace.join('\n'),
+    entryMessage(entry),
+    entryStackTrace(entry).join('\n'),
   ]);
   return `﻿${[header, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n')}\r\n`;
 }

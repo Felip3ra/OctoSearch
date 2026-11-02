@@ -47,6 +47,14 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 - Arquivos acima de 200 MB são abertos pelo final (os registros mais recentes), com aviso na tela.
 - Listas com milhões de registros agora rolam até o fim (antes o navegador limitava a altura) e atualizam bem mais rápido.
 - Pacote menor: o app leva só os idiomas pt-BR e en-US do Chromium (47 MB a menos instalado; instalador de 114 para 105 MB).
+- Metade da memória: data, mensagem e stack trace deixaram de ser cópias e viraram posições dentro do texto original do registro. Um log de 200 MB (2,2 milhões de registros) caiu de 1,6 GB para 0,8 GB na aba.
+- O tempo real com milhões de registros ficou quase instantâneo: busca, filtros, contagem por nível e posição das linhas processam só os registros novos. A tela travava 0,87 s a cada linha nova com um filtro ativo; agora trava ~0,05 s. Aplicar uma busca caiu de 0,95 s para 0,4 s.
+- A busca procura no registro inteiro, como está no arquivo (data, nível, mensagem, propriedades e stack trace).
+
+**Acesso às pastas**
+
+- Pasta negada não some mais com um erro: aparece um aviso com o botão **Permitir e abrir**, também para as abas restauradas ao abrir o app.
+- **Configurações → Pastas liberadas** mostra as pastas que o app pode ler, com a opção de revogar cada uma.
 
 **Segurança**
 

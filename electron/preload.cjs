@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   importKnownFolders: (folderPaths) => ipcRenderer.invoke('fs:importKnownFolders', folderPaths),
   readFolder: (folderPath) => ipcRenderer.invoke('fs:readFolder', folderPath),
+  listAllowedFolders: () => ipcRenderer.invoke('fs:listAllowedFolders'),
+  revokeFolder: (folderPath) => ipcRenderer.invoke('fs:revokeFolder', folderPath),
   readFile: (filePath) => ipcRenderer.invoke('fs:readFile', filePath),
   readFileFrom: (filePath, offset) => ipcRenderer.invoke('fs:readFileFrom', filePath, offset),
   checkFileStats: (filePath) => ipcRenderer.invoke('fs:checkFileStats', filePath),

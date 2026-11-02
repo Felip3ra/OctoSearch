@@ -304,6 +304,18 @@ ipcMain.handle('fs:importKnownFolders', async (event, folderPaths) => {
   return allowedFolders.importKnown(await Promise.all(valid.map(realPathOrSelf)));
 });
 
+// Pastas liberadas, para a tela de configurações (o usuário pode revogar cada uma).
+ipcMain.handle('fs:listAllowedFolders', async (event) => {
+  assertTrustedSender(event);
+  return allowedFolders.list();
+});
+
+ipcMain.handle('fs:revokeFolder', async (event, folderPath) => {
+  assertTrustedSender(event);
+  assertString(folderPath, 'folderPath');
+  return allowedFolders.remove(folderPath);
+});
+
 // Leitura de uma pasta pelo caminho salvo: pede confirmação se ela ainda não foi liberada.
 ipcMain.handle('fs:readFolder', async (event, folderPath) => {
   assertTrustedSender(event);

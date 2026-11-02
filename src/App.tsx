@@ -11,7 +11,8 @@ import {
   FileSortField,
   SortDirection,
 } from './types';
-import { filterLogEntries, getIncludeBlocks, getPatternError } from './services/logSearch';
+import { getIncludeBlocks, getPatternError } from './services/logSearch';
+import { IncrementalFilter, IncrementalLevelCounter } from './services/logView';
 import { getSourceColor } from './services/logMerge';
 import { buildExport, ExportFormat, exportFileName, saveExport } from './services/logExport';
 import { useLogLoader, MAX_INITIAL_READ_BYTES } from './hooks/useLogLoader';
@@ -64,11 +65,17 @@ import {
   Layers,
   FileText,
   FolderOpen,
+  ShieldAlert,
 } from 'lucide-react';
+import { isFolderAccessDenied } from './utils/folderAccess';
 
 function getFolderNameFromPath(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts.at(-1) || 'Logs';
+}
+
+function withDeniedFolder(list: { path: string; name: string }[], path: string, name: string) {
+  return list.some((item) => samePath(item.path, path)) ? list : [...list, { path, name }];
 }
 
 function samePath(a: string, b: string): boolean {
@@ -255,6 +262,11 @@ export default function App() {
     highlightRulesCodec
   );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  /** Saved or restored folders whose access the user did not allow; they can be retried from a notice. */
+  const [deniedFolders, setDeniedFolders] = useState<{ path: string; name: string }[]>([]);
+  const noteDeniedFolder = (path: string, name: string) => setDeniedFolders((current) => withDeniedFolder(current, path, name));
+  const forgetDeniedFolder = (path: string) =>
+    setDeniedFolders((current) => current.filter((item) => !samePath(item.path, path)));
   const [wordWrap, setWordWrap] = usePersistedState('log-viewer-word-wrap', false, booleanCodec);
   const [fileSortField, setFileSortField] = usePersistedState<FileSortField>(
     'log-viewer-file-sort-field',
@@ -372,12 +384,17 @@ export default function App() {
       setIsLoading(true);
       setLoadingProgress(10);
       const nativeFiles = await window.electronAPI.readFolder(folderPath);
+      forgetDeniedFolder(folderPath);
       if (nativeFiles.length === 0) {
         alert(`A pasta ${folderPath} não contém arquivos de log compatíveis.`);
         return;
       }
       handleOpenNewFolder(folderPath, nativeFilesToItems(nativeFiles, 'electron'), folderName);
     } catch (err: unknown) {
+      if (isFolderAccessDenied(err)) {
+        noteDeniedFolder(folderPath, folderName);
+        return;
+      }
       console.error('Erro ao ler pasta nativamente:', err);
       alert(`Erro ao abrir pasta: ${(err as Error)?.message || err}`);
     } finally {
@@ -440,7 +457,8 @@ export default function App() {
               );
             }
           } catch (error) {
-            console.warn(`Não foi possível restaurar a pasta "${persisted.path}".`, error);
+            if (isFolderAccessDenied(error)) setDeniedFolders((current) => withDeniedFolder(current, persisted.path, persisted.name));
+            else console.warn(`Não foi possível restaurar a pasta "${persisted.path}".`, error);
           }
         }
         setLoadingProgress(Math.round(((index + 1) / toRestore.length) * 100));
@@ -664,8 +682,12 @@ export default function App() {
   const setLineLimitDirection = (direction: 'tail' | 'head') =>
     updateActiveTab((tab) => ({ ...tab, lineLimitDirection: direction }));
 
+  // Both remember the previous timeline, so live updates only look at the new records.
+  const [entryFilter] = useState(() => new IncrementalFilter());
+  const [levelCounter] = useState(() => new IncrementalLevelCounter());
+
   const filteredEntries = useMemo(() => {
-    return filterLogEntries(entries, {
+    return entryFilter.apply(entries, {
       searchTerm: '',
       searchMode,
       searchFilters,
@@ -677,7 +699,7 @@ export default function App() {
       timeFrom,
       timeTo,
     });
-  }, [entries, searchMode, searchFilters, includeOperator, levelFilter, lineLimit, customLineLimit, lineLimitDirection, timeFrom, timeTo]);
+  }, [entryFilter, entries, searchMode, searchFilters, includeOperator, levelFilter, lineLimit, customLineLimit, lineLimitDirection, timeFrom, timeTo]);
 
   const latestEntryTime = useMemo(() => {
     for (let index = entries.length - 1; index >= 0; index--) {
@@ -687,13 +709,7 @@ export default function App() {
     return undefined;
   }, [entries]);
 
-  const levelCounts = useMemo(() => {
-    const counts: Record<string, number> = { ALL: entries.length, INF: 0, WRN: 0, ERR: 0, DBG: 0, OTHER: 0 };
-    entries.forEach((entry) => {
-      counts[entry.level]++;
-    });
-    return counts;
-  }, [entries]);
+  const levelCounts = useMemo(() => levelCounter.count(entries), [levelCounter, entries]);
 
   const clearAllFilters = useCallback(() => {
     updateActiveTab((tab) => ({
@@ -869,6 +885,30 @@ export default function App() {
         onToggleTheme={() => setIsDarkMode((current) => !current)}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
+
+      {deniedFolders.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-500" />
+          <span className="min-w-0">
+            {deniedFolders.length === 1 ? 'O acesso a esta pasta não foi permitido, por isso ela não foi aberta:' : 'O acesso a estas pastas não foi permitido, por isso elas não foram abertas:'}
+          </span>
+          {deniedFolders.map((folder) => (
+            <span key={folder.path} className="flex min-w-0 items-center gap-1.5 rounded border border-amber-300 bg-white/70 py-0.5 pl-2 pr-0.5 dark:border-amber-800 dark:bg-amber-950/50">
+              <span className="max-w-72 truncate font-semibold" title={folder.path}>{folder.name}</span>
+              <button
+                type="button"
+                onClick={() => void handleOpenSavedFolder(folder.path, folder.name)}
+                className="shrink-0 rounded bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-amber-600"
+              >
+                Permitir e abrir
+              </button>
+            </span>
+          ))}
+          <button type="button" onClick={() => setDeniedFolders([])} className="ml-auto shrink-0 rounded p-0.5 hover:bg-amber-100 dark:hover:bg-amber-900/40" aria-label="Fechar aviso">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:flex-row">
         <FileList

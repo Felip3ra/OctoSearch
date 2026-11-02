@@ -611,7 +611,15 @@
           <li><strong>Tema</strong> e <strong>Quebra de linha</strong>: mostram o estado atual.</li>
           <li><strong>Ordenar por</strong>: nome, data de criação ou última modificação dos arquivos.</li>
           <li><strong>Direção</strong>: crescente (mais antigos primeiro) ou decrescente (mais recentes primeiro).</li>
+          <li><strong>Pastas liberadas</strong> (só no aplicativo desktop): as pastas que o OctoSearch tem permissão para ler. Veja abaixo.</li>
         </ul>
+        <h3 id="pastas-liberadas">Pastas liberadas</h3>
+        <p>O OctoSearch só lê logs dentro das pastas que você escolheu em <strong>Abrir pasta</strong> ou autorizou, incluindo as subpastas delas. A lista mostra cada pasta com o nome e o caminho. Passe o mouse para ver o caminho completo.</p>
+        <figure class="narrow">
+          <a href="manual/25-pastas-liberadas.webp" target="_blank" rel="noopener"><img src="manual/25-pastas-liberadas.webp" width="750" height="320" loading="lazy" alt="Lista de pastas liberadas com o botão Revogar em cada uma" /></a>
+          <figcaption>Três pastas liberadas; cada uma pode ser revogada.</figcaption>
+        </figure>
+        <p><strong>Revogar</strong> tira a permissão. As abas daquela pasta param de atualizar, e na próxima vez que ela for aberta o OctoSearch pergunta de novo se pode ler os logs.</p>
         <h3>Modo claro e escuro</h3>
         <p>O ícone de <strong>sol/lua</strong> ao lado da engrenagem alterna entre o tema escuro e o claro. A escolha fica salva.</p>
         <figure>
@@ -665,6 +673,7 @@
         </ul>
         <h3>Arquivos muito grandes</h3>
         <p>Arquivos com mais de <strong>200 MB</strong> são abertos pelo final: o OctoSearch carrega os últimos 200 MB (os registros mais recentes) e mostra um aviso azul. Os números de linha passam a contar a partir do trecho carregado. O processamento acontece em segundo plano, então a janela continua respondendo enquanto o arquivo é lido.</p>
+        <p>Mesmo com milhões de registros, o tempo real continua leve: a busca, os filtros e a contagem por nível processam só as linhas novas, sem refazer o arquivo inteiro. Como referência, um log de 200 MB (2,2 milhões de registros) ocupa cerca de 0,8 GB de memória.</p>
         <h3>Formato não reconhecido</h3>
         <p>Se nenhuma linha de um arquivo seguir um formato conhecido, o OctoSearch avisa e mostra o arquivo <strong>linha a linha</strong>, sem data e nível. A busca, os marcadores e a cópia continuam funcionando normalmente.</p>
         <figure>
@@ -682,6 +691,12 @@
         <p>Só são listados arquivos <code>.log</code>, <code>.txt</code>, rotacionados (<code>.log.1</code>, <code>.txt.2</code>…) e compactados (<code>.log.1.gz</code>). Confira a extensão dos seus logs e se você tem permissão de leitura na pasta.</p>
         <h3>O OctoSearch pediu permissão para ler uma pasta</h3>
         <p>Por segurança, o aplicativo só lê logs dentro de pastas que você escolheu em <strong>Abrir pasta</strong> ou autorizou. Ao abrir uma pasta salva ou digitada pela primeira vez, ele pergunta <em>“Permitir que o OctoSearch leia os logs desta pasta?”</em>. Clique em <strong>Permitir</strong>: a autorização fica guardada para as próximas vezes. As pastas que você já usava antes da versão 1.1.0 continuam liberadas.</p>
+        <p>Se você clicar em <strong>Cancelar</strong>, a pasta não é aberta e um aviso amarelo aparece abaixo das abas. Isso também vale para as abas restauradas ao abrir o app. Clique em <strong>Permitir e abrir</strong> quando quiser abri-la.</p>
+        <figure>
+          <a href="manual/26-acesso-negado.webp" target="_blank" rel="noopener"><img src="manual/26-acesso-negado.webp" width="1000" height="66" loading="lazy" alt="Aviso amarelo: o acesso a esta pasta não foi permitido, com o botão Permitir e abrir" /></a>
+          <figcaption>O aviso de pasta não liberada.</figcaption>
+        </figure>
+        <p>Para ver ou revogar as pastas já liberadas, abra as <a href="#pastas-liberadas">Configurações → Pastas liberadas</a>.</p>
         <h3>Faltam arquivos em pastas muito grandes</h3>
         <p>Para não travar em pastas enormes ou de rede, o OctoSearch lista até <strong>5.000 arquivos</strong> e desce até <strong>12 níveis</strong> de subpastas. Abra uma subpasta mais específica.</p>
         <h3>A busca não encontra um texto que eu sei que existe</h3>

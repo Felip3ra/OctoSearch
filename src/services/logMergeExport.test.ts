@@ -1,23 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { LogEntry } from '../types';
+import { compactEntry, DraftEntry, entryMessage } from './logEntry';
 import { mergeLogSources } from './logMerge';
 import { buildCsv, buildLogText, exportFileName } from './logExport';
 
-function entry(id: number, message: string, time?: number, extra: Partial<LogEntry> = {}): LogEntry {
-  return {
-    id,
-    startLine: id,
-    endLine: id,
-    timestamp: time === undefined ? '' : new Date(time).toISOString(),
-    time,
-    level: 'INF',
-    rawLevel: 'INF',
-    message,
-    stackTrace: [],
-    rawText: `${time ?? ''} ${message}`.trim(),
-    hasStackTrace: false,
-    ...extra,
-  };
+function entry(id: number, message: string, time?: number, extra: Partial<DraftEntry> & { sourceFile?: string } = {}): LogEntry {
+  const { sourceFile, ...draft } = extra;
+  const timestamp = time === undefined ? '' : new Date(time).toISOString();
+  const stackTrace = draft.stackTrace ?? [];
+  const stored = compactEntry(
+    { id, startLine: id, endLine: id, timestamp, time, level: 'INF', rawLevel: 'INF', message, ...draft, stackTrace },
+    [`${timestamp} ${message}`.trim(), ...stackTrace]
+  );
+  return sourceFile ? { ...stored, sourceFile } : stored;
 }
 
 describe('mergeLogSources', () => {
@@ -31,7 +26,7 @@ describe('mergeLogSources', () => {
       { label: 'api.log', entries: [entry(1, 'api-1', 10), entry(2, 'api-2', 30)] },
       { label: 'worker.log', entries: [entry(1, 'worker-1', 20)] },
     ]);
-    expect(merged.map((item) => [item.message, item.sourceFile])).toEqual([
+    expect(merged.map((item) => [entryMessage(item), item.sourceFile])).toEqual([
       ['api-1', 'api.log'],
       ['worker-1', 'worker.log'],
       ['api-2', 'api.log'],
@@ -44,18 +39,19 @@ describe('mergeLogSources', () => {
       { label: 'a', entries: [entry(1, 'a1', 10), entry(2, 'a-sem-data'), entry(3, 'a2', 40)] },
       { label: 'b', entries: [entry(1, 'b1', 20)] },
     ]);
-    expect(merged.map((item) => item.message)).toEqual(['a1', 'a-sem-data', 'b1', 'a2']);
+    expect(merged.map(entryMessage)).toEqual(['a1', 'a-sem-data', 'b1', 'a2']);
   });
 });
 
 describe('export', () => {
   const entries = [
     entry(1, 'simples', 0, { sourceFile: 'api.log' }),
-    entry(2, 'com; "aspas"', 1000, { level: 'ERR', rawLevel: 'ERROR', stackTrace: ['Ex', '  at A'], hasStackTrace: true }),
+    entry(2, 'com; "aspas"', 1000, { level: 'ERR', rawLevel: 'ERROR', stackTrace: ['Ex', '  at A'] }),
   ];
 
   it('builds plain text with optional source prefix', () => {
-    expect(buildLogText(entries, false).split('\n')).toHaveLength(2);
+    // The second record is written with its two stack trace lines.
+    expect(buildLogText(entries, false).split('\n')).toHaveLength(4);
     expect(buildLogText(entries, true).startsWith('[api.log] ')).toBe(true);
   });
 

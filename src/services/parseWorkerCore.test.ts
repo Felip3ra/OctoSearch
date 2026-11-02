@@ -1,6 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { ParseWorkerCore, ParseWorkerResponse } from './parseWorkerCore';
+import { entryMessage } from './logEntry';
 
 function createCore() {
   const responses: ParseWorkerResponse[] = [];
@@ -26,12 +27,12 @@ describe('ParseWorkerCore', () => {
     await core.handle(parseRequest('2026-10-06 10:00:00 [INF] um\n2026-10-06 10:00:01 [ERR] dois\n'));
     const first = last();
     expect(first).toMatchObject({ type: 'result', fromIndex: 0, canAppend: true, encoding: 'utf-8' });
-    expect(first.type === 'result' && first.entries.map((entry) => entry.message)).toEqual(['um', 'dois']);
+    expect(first.type === 'result' && first.entries.map(entryMessage)).toEqual(['um', 'dois']);
 
     await core.handle({ type: 'append', requestId: 2, key: 'a', bytes: bytesOf('   at A.B()\n2026-10-06 10:00:02 [INF] três\n') });
     const second = last();
     expect(second).toMatchObject({ type: 'result', requestId: 2, fromIndex: 1 });
-    expect(second.type === 'result' && second.entries.map((entry) => [entry.message, entry.stackTrace.length])).toEqual([
+    expect(second.type === 'result' && second.entries.map((entry) => [entryMessage(entry), entry.stackLines])).toEqual([
       ['dois', 1],
       ['três', 0],
     ]);
@@ -45,7 +46,7 @@ describe('ParseWorkerCore', () => {
     await core.handle({ type: 'append', requestId: 2, key: 'a', bytes: accented.slice(0, cut).buffer as ArrayBuffer });
     await core.handle({ type: 'append', requestId: 3, key: 'a', bytes: accented.slice(cut).buffer as ArrayBuffer });
     const result = last();
-    expect(result.type === 'result' && result.entries.at(-1)?.message).toBe('ação');
+    expect(result.type === 'result' && entryMessage(result.entries.at(-1)!)).toBe('ação');
   });
 
   it('asks for a full read when the file cannot be continued', async () => {
@@ -65,11 +66,11 @@ describe('ParseWorkerCore', () => {
     await core.handle(parseRequest(new Uint8Array(gz).buffer as ArrayBuffer, { gzip: true }));
     const gzResult = last();
     expect(gzResult).toMatchObject({ type: 'result', canAppend: false });
-    expect(gzResult.type === 'result' && gzResult.entries[0].message).toBe('compactado');
+    expect(gzResult.type === 'result' && entryMessage(gzResult.entries[0])).toBe('compactado');
 
     await core.handle(parseRequest('cortado] fim\n2026-10-06 10:00:00 [INF] inteiro\n', { truncated: true }));
     const truncated = last();
-    expect(truncated.type === 'result' && truncated.entries.map((entry) => entry.message)).toEqual(['inteiro']);
+    expect(truncated.type === 'result' && truncated.entries.map(entryMessage)).toEqual(['inteiro']);
   });
 
   it('reports errors instead of throwing', async () => {

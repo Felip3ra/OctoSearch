@@ -1,4 +1,5 @@
 import { LogEntry, EntryLogLevel } from '../types';
+import { compactEntry, DraftEntry, lineEntry } from './logEntry';
 
 /**
  * Supported layouts (one record per line; indented lines are continuations/stack traces):
@@ -260,7 +261,7 @@ function parseEntryStart(rawLine: string): ParsedStart | null {
 }
 
 interface ParserState {
-  current: LogEntry | null;
+  current: DraftEntry | null;
   rawLines: string[];
   awaitsMelMessage: boolean;
   entries: LogEntry[];
@@ -268,7 +269,8 @@ interface ParserState {
   recognizedStarts: number;
   dayOffset: number;
   lastTimeOfDay: number | null;
-  timeOnlyEntries: LogEntry[];
+  /** Time-only records (drafts while open, then their stored form), anchored to a date in `snapshot()`. */
+  timeOnlyEntries: { time?: number }[];
 }
 
 function finalizeEntry(state: ParserState): void {
@@ -280,9 +282,10 @@ function finalizeEntry(state: ParserState): void {
     trailingBlank++;
   }
   entry.endLine -= trailingBlank;
-  entry.rawText = state.rawLines.slice(0, state.rawLines.length - trailingBlank).join('\n');
-  entry.hasStackTrace = entry.stackTrace.length > 0;
-  state.entries.push(entry);
+  const stored = compactEntry(entry, state.rawLines.slice(0, state.rawLines.length - trailingBlank));
+  const timeOnly = state.timeOnlyEntries;
+  if (timeOnly[timeOnly.length - 1] === entry) timeOnly[timeOnly.length - 1] = stored;
+  state.entries.push(stored);
   state.current = null;
 }
 
@@ -306,8 +309,6 @@ function startEntry(state: ParserState, lineNumber: number, rawLine: string, sta
     rawLevel: start.rawLevel,
     message: start.message.trim(),
     stackTrace: start.stackTrace ?? [],
-    rawText: '',
-    hasStackTrace: false,
   };
   if (start.timeOnly && time !== undefined) state.timeOnlyEntries.push(state.current);
   state.rawLines = [rawLine];
@@ -348,8 +349,6 @@ function processLogLine(rawLine: string, lineNumber: number, state: ParserState)
       rawLevel: '',
       message: rawLine.trim(),
       stackTrace: [],
-      rawText: '',
-      hasStackTrace: false,
     };
     state.rawLines = [rawLine];
   }
@@ -358,19 +357,7 @@ function processLogLine(rawLine: string, lineNumber: number, state: ParserState)
 function linePerEntry(lines: string[]): LogEntry[] {
   const entries: LogEntry[] = [];
   lines.forEach((line, index) => {
-    if (!line.trim()) return;
-    entries.push({
-      id: entries.length + 1,
-      startLine: index + 1,
-      endLine: index + 1,
-      timestamp: '',
-      level: 'OTHER',
-      rawLevel: '',
-      message: line,
-      stackTrace: [],
-      rawText: line,
-      hasStackTrace: false,
-    });
+    if (line.trim()) entries.push(lineEntry(entries.length + 1, index + 1, line));
   });
   return entries;
 }

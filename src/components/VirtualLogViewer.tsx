@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { HighlightRule, LogEntry, SearchPattern } from '../types';
 import { createAnyPatternMatcher } from '../services/logSearch';
+import { entryStackTrace, hasStackTrace } from '../services/logEntry';
+import { sharedPrefixLength } from '../services/logView';
 import { LogEntryRow } from './LogEntryRow';
 import { SearchX, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { normalizeHighlightColor } from '../utils/highlightColor';
@@ -29,6 +31,52 @@ const OVERSCAN = 15;
 // area and the scroll position is mapped proportionally onto the real row positions.
 const MAX_SCROLL_HEIGHT = 10_000_000;
 
+/**
+ * Row positions of the whole list. A row's height only depends on its own record and on the
+ * expansion/measurement state, so when only the tail of the list changed (live updates) the
+ * positions of the unchanged rows are copied instead of being computed again.
+ */
+class RowLayout {
+  private entries: LogEntry[] = [];
+  private inputs: unknown[] = [];
+  private positions = new Float64Array(0);
+  private totalHeight = 0;
+  /** Index of the first record with a stack trace (Infinity when there is none). */
+  private firstException = Infinity;
+
+  compute(entries: LogEntry[], expandedIds: Set<number>, measuredHeights: Map<number, number>, wordWrap: boolean) {
+    const inputs = [expandedIds, measuredHeights, wordWrap];
+    const sameInputs = inputs.every((value, index) => value === this.inputs[index]);
+    const kept = sameInputs ? sharedPrefixLength(this.entries, entries) : 0;
+    const positions = new Float64Array(entries.length);
+    let currentY = 0;
+    let firstException = Infinity;
+    if (kept > 0) {
+      positions.set(this.positions.subarray(0, kept));
+      currentY = kept < this.entries.length ? this.positions[kept] : this.totalHeight;
+      if (this.firstException < kept) firstException = this.firstException;
+    }
+
+    for (let i = kept; i < entries.length; i++) {
+      positions[i] = currentY;
+      const entry = entries[i];
+      let rowH = wordWrap ? measuredHeights.get(entry.id) || BASE_ROW_HEIGHT : BASE_ROW_HEIGHT;
+      if (entry.stackLines > 0) {
+        if (firstException === Infinity) firstException = i;
+        if (!wordWrap && expandedIds.has(entry.id)) rowH += STACK_CONTAINER_PADDING + entry.stackLines * LINE_HEIGHT_STACK;
+      }
+      currentY += rowH;
+    }
+
+    this.entries = entries;
+    this.inputs = inputs;
+    this.positions = positions;
+    this.totalHeight = currentY;
+    this.firstException = firstException;
+    return { positions, totalHeight: currentY, hasAnyExceptions: firstException !== Infinity };
+  }
+}
+
 export function VirtualLogViewer({
   entries,
   allEntries = entries,
@@ -54,7 +102,7 @@ export function VirtualLogViewer({
     const matchingIds = new Set<number>();
 
     entries.forEach((entry) => {
-      if (entry.hasStackTrace && entry.stackTrace.some(matches)) {
+      if (hasStackTrace(entry) && entryStackTrace(entry).some(matches)) {
         matchingIds.add(entry.id);
       }
     });
@@ -122,7 +170,7 @@ export function VirtualLogViewer({
   const handleExpandAll = useCallback(() => {
     const all = new Set<number>();
     entries.forEach((e) => {
-      if (e.hasStackTrace) all.add(e.id);
+      if (hasStackTrace(e)) all.add(e.id);
     });
     setExpandedIds(all);
   }, [entries]);
@@ -132,23 +180,11 @@ export function VirtualLogViewer({
   }, []);
 
   // Compute row heights and cumulative positions taking expansions into account
-  const { positions, totalHeight } = useMemo(() => {
-    const count = entries.length;
-    const pos = new Float64Array(count);
-    let currentY = 0;
-
-    for (let i = 0; i < count; i++) {
-      pos[i] = currentY;
-      const entry = entries[i];
-      let rowH = wordWrap ? measuredHeights.get(entry.id) || BASE_ROW_HEIGHT : BASE_ROW_HEIGHT;
-      if (!wordWrap && entry.hasStackTrace && expandedIds.has(entry.id)) {
-        rowH += STACK_CONTAINER_PADDING + entry.stackTrace.length * LINE_HEIGHT_STACK;
-      }
-      currentY += rowH;
-    }
-
-    return { positions: pos, totalHeight: currentY };
-  }, [entries, expandedIds, measuredHeights, wordWrap]);
+  const [rowLayout] = useState(() => new RowLayout());
+  const { positions, totalHeight, hasAnyExceptions } = useMemo(
+    () => rowLayout.compute(entries, expandedIds, measuredHeights, wordWrap),
+    [rowLayout, entries, expandedIds, measuredHeights, wordWrap]
+  );
 
   const scrollHeight = Math.min(totalHeight, MAX_SCROLL_HEIGHT);
   const scrollRatio =
@@ -225,10 +261,23 @@ export function VirtualLogViewer({
     };
   }, [allEntries]);
 
-  // null when nothing is filtered out (no need to index millions of ids).
-  const filteredIds = useMemo(
-    () => (entries.length === allEntries.length ? null : new Set(entries.map((entry) => entry.id))),
-    [entries, allEntries]
+  // The filtered list keeps the timeline order, so membership is a binary search over it
+  // (no need to index hundreds of thousands of ids on every live update).
+  const isShown = useCallback(
+    (timelineIndex: number): boolean => {
+      if (entries.length === allEntries.length) return true;
+      let low = 0;
+      let high = entries.length - 1;
+      while (low <= high) {
+        const middle = (low + high) >> 1;
+        const index = indexOfEntry(entries[middle].id) ?? -1;
+        if (index === timelineIndex) return true;
+        if (index < timelineIndex) low = middle + 1;
+        else high = middle - 1;
+      }
+      return false;
+    },
+    [entries, allEntries.length, indexOfEntry]
   );
 
   const minimapItems = useMemo(() => {
@@ -256,7 +305,7 @@ export function VirtualLogViewer({
             ? entry.rawText.includes(rule.text)
             : entry.rawText.toLocaleLowerCase('pt-BR').includes(rule.text.toLocaleLowerCase('pt-BR'));
         });
-        const isFiltered = filteredIds ? filteredIds.has(entry.id) : true;
+        const isFiltered = isShown(index);
         const width = 24 + Math.min(72, Math.round((Math.min(entry.rawText.length, 220) / 220) * 72));
         return {
           id: entry.id,
@@ -267,7 +316,7 @@ export function VirtualLogViewer({
           highlightColor: highlightRule?.color,
         };
       });
-  }, [allEntries, indexOfEntry, entries, filteredIds, highlightRules]);
+  }, [allEntries, indexOfEntry, entries, isShown, highlightRules]);
 
   const viewportBounds = useMemo(() => {
     if (entries.length === 0 || allEntries.length === 0) return { top: 0, height: 100 };
@@ -360,7 +409,6 @@ export function VirtualLogViewer({
     );
   }
 
-  const hasAnyExceptions = entries.some((e) => e.hasStackTrace);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 relative">

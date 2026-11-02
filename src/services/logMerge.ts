@@ -1,4 +1,5 @@
 import { LogEntry } from '../types';
+import { sharedPrefixLength } from './logView';
 
 export interface LogSource {
   label: string;
@@ -14,6 +15,9 @@ export interface LogSource {
 export function mergeLogSources(sources: LogSource[]): LogEntry[] {
   if (sources.length === 0) return [];
   const tagSource = sources.length > 1;
+  // Already chronological single file (the usual case): keep the parsed array and its ids, without
+  // allocating anything per record, since this runs on every live update.
+  if (!tagSource && isChronological(sources[0].entries)) return sources[0].entries;
 
   const keyed: { entry: LogEntry; label: string; key: number }[] = [];
   for (const source of sources) {
@@ -41,6 +45,33 @@ export function mergeLogSources(sources: LogSource[]): LogEntry[] {
     id: index + 1,
     sourceFile: tagSource ? label : entry.sourceFile,
   }));
+}
+
+/**
+ * The last timeline found to be chronological; live updates only check what was added to it.
+ * Weak, so a closed file's records are not kept alive by this cache.
+ */
+let lastChronological = new WeakRef<LogEntry[]>([]);
+
+/** True when the dated records never go back in time (undated ones keep their place). */
+function isChronological(entries: LogEntry[]): boolean {
+  const kept = sharedPrefixLength(lastChronological.deref() ?? [], entries);
+  let last = -Infinity;
+  for (let index = kept - 1; index >= 0; index--) {
+    const time = entries[index].time;
+    if (time !== undefined) {
+      last = time;
+      break;
+    }
+  }
+  for (let index = kept; index < entries.length; index++) {
+    const time = entries[index].time;
+    if (time === undefined) continue;
+    if (time < last) return false;
+    last = time;
+  }
+  lastChronological = new WeakRef(entries);
+  return true;
 }
 
 const SOURCE_COLORS = [

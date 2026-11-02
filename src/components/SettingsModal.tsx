@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, Files, Keyboard, Moon, Settings, Sun, WrapText, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, Files, FolderLock, Keyboard, Moon, Settings, Sun, WrapText, X } from 'lucide-react';
 import { FileSortField, SortDirection } from '../types';
 
 interface SettingsModalProps {
@@ -24,6 +25,85 @@ const SHORTCUTS = [
   ['Ctrl + Shift + W', 'Alternar quebra de linha'],
   ['Ctrl + ,', 'Abrir configurações'],
 ];
+
+/** Long paths keep their end, which is what tells two folders apart. */
+function shortenPath(folder: string, max = 64): string {
+  return folder.length > max ? `…${folder.slice(folder.length - max + 1)}` : folder;
+}
+
+function folderName(folder: string): string {
+  return folder.split(/[\\/]/).filter(Boolean).pop() || folder;
+}
+
+/** Folders the desktop app may read; each one can be revoked (the app asks again the next time). */
+function AllowedFoldersSection() {
+  const api = window.electronAPI;
+  const [folders, setFolders] = useState<string[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api?.listAllowedFolders?.().then(
+      (list) => {
+        if (!cancelled) setFolders(list);
+      },
+      () => {
+        if (!cancelled) setError('Não foi possível carregar a lista.');
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  if (!api?.listAllowedFolders || !api.revokeFolder) return null;
+  const revokeFolder = api.revokeFolder;
+
+  const revoke = async (folder: string) => {
+    try {
+      await revokeFolder(folder);
+      setFolders((current) => current?.filter((item) => item !== folder) ?? null);
+    } catch {
+      setError('Não foi possível revogar a pasta.');
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
+        <FolderLock className="h-3.5 w-3.5" />
+        Pastas liberadas
+      </h3>
+      <p className="mb-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+        O OctoSearch só lê logs dentro destas pastas (e das subpastas). Ao revogar uma pasta, as abas dela param de
+        atualizar e o app pede permissão de novo na próxima vez que ela for aberta.
+      </p>
+      {error && <p className="mb-2 text-[11px] text-rose-600 dark:text-rose-400">{error}</p>}
+      {folders && folders.length === 0 && (
+        <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500 dark:border-slate-700">Nenhuma pasta liberada.</p>
+      )}
+      {folders && folders.length > 0 && (
+        <ul className="max-h-40 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+          {folders.map((folder) => (
+            <li key={folder} className="flex items-center gap-2 px-3 py-1.5">
+              <span className="min-w-0 flex-1" title={folder}>
+                <span className="block truncate text-xs font-medium text-slate-800 dark:text-slate-100">{folderName(folder)}</span>
+                <span className="block truncate font-mono text-[10px] text-slate-500 dark:text-slate-400">{shortenPath(folder)}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => void revoke(folder)}
+                className="shrink-0 rounded border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-600 dark:text-slate-300 dark:hover:border-rose-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
+              >
+                Revogar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export function SettingsModal({
   isOpen,
@@ -72,7 +152,7 @@ export function SettingsModal({
           </button>
         </header>
 
-        <div className="space-y-5 p-4">
+        <div className="max-h-[calc(100vh-8rem)] space-y-5 overflow-y-auto p-4">
           <div>
             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
               Aparência e leitura
@@ -147,6 +227,8 @@ export function SettingsModal({
               </div>
             </div>
           </div>
+
+          <AllowedFoldersSection />
 
           <div>
             <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">

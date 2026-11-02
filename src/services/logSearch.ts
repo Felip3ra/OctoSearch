@@ -1,4 +1,5 @@
 import { FilterOperator, LogEntry, LogLevel, SearchFilter, SearchMode, SearchPattern } from '../types';
+import { entrySearchText } from './logEntry';
 
 export interface FilterOptions {
   searchTerm: string;
@@ -85,26 +86,14 @@ export function getIncludeBlocks(
   return blocks;
 }
 
+
 /**
- * Filters log entries by level, date range, text search, and line count limit.
- * Preserves matches within stack traces along with full entry context.
+ * Compiles the level, date range and text conditions into one predicate, or null when nothing is
+ * filtered (callers can then keep the whole timeline as it is). The line limit is applied apart.
+ * Text terms are looked for in the whole record, stack trace included.
  */
-export function filterLogEntries(
-  entries: LogEntry[],
-  options: FilterOptions
-): LogEntry[] {
-  const {
-    searchTerm,
-    searchMode = 'include',
-    searchFilters = [],
-    includeOperator = 'or',
-    level,
-    lineLimit = 'ALL',
-    customLineLimit = 100,
-    lineLimitDirection = 'tail',
-    timeFrom,
-    timeTo,
-  } = options;
+export function createEntryFilter(options: FilterOptions): ((entry: LogEntry) => boolean) | null {
+  const { searchTerm, searchMode = 'include', searchFilters = [], includeOperator = 'or', level, timeFrom, timeTo } = options;
   let normalizedFilters: SearchFilter[] = [];
   if (searchFilters.length > 0) {
     normalizedFilters = searchFilters
@@ -115,13 +104,14 @@ export function filterLogEntries(
       { id: 'legacy-search', text: searchTerm.trim(), mode: searchMode },
     ];
   }
+  const hasTimeRange = timeFrom !== undefined || timeTo !== undefined;
+  if (level === 'ALL' && !hasTimeRange && normalizedFilters.length === 0) return null;
+
   const matchers = new Map(normalizedFilters.map((filter) => [filter.id, createPatternMatcher(filter)]));
   const includeBlocks = getIncludeBlocks(normalizedFilters, includeOperator);
   const excludeTerms = normalizedFilters.filter((filter) => filter.mode === 'exclude');
-  const hasTimeRange = timeFrom !== undefined || timeTo !== undefined;
 
-  // Nothing to filter: keep the same array (cheap for multi-million-record live views).
-  const filtered = level === 'ALL' && !hasTimeRange && normalizedFilters.length === 0 ? entries : entries.filter((entry) => {
+  return (entry) => {
     // 1. Level filter
     if (level !== 'ALL' && entry.level !== level) {
       return false;
@@ -139,13 +129,7 @@ export function filterLogEntries(
       return true;
     }
 
-    const searchableText = [
-      entry.message,
-      entry.timestamp,
-      entry.rawLevel,
-      entry.sourceFile || '',
-      ...entry.stackTrace,
-    ].join('\n');
+    const searchableText = entrySearchText(entry);
     const lowerText = searchableText.toLowerCase();
 
     // A record matches when every term of at least one block is present (AND inside, OR between blocks).
@@ -156,29 +140,30 @@ export function filterLogEntries(
     const matchesAnyExclusion = excludeTerms.some(containsTerm);
 
     return matchesInclusions && !matchesAnyExclusion;
-  });
+  };
+}
 
-  // 4. Line count limit filter
-  if (lineLimit && lineLimit !== 'ALL') {
-    let limitCount = 0;
-    if (lineLimit === 'custom') {
-      limitCount = Math.max(1, customLineLimit || 100);
-    } else {
-      limitCount = Number.parseInt(lineLimit, 10);
-    }
+/** Keeps the first or last N records when a line limit is chosen. */
+export function applyLineLimit(entries: LogEntry[], options: FilterOptions): LogEntry[] {
+  const { lineLimit = 'ALL', customLineLimit = 100, lineLimitDirection = 'tail' } = options;
+  if (!lineLimit || lineLimit === 'ALL') return entries;
+  const limitCount = lineLimit === 'custom' ? Math.max(1, customLineLimit || 100) : Number.parseInt(lineLimit, 10);
+  if (Number.isNaN(limitCount) || limitCount <= 0 || limitCount >= entries.length) return entries;
+  // tail: the last N records (like tail -n); head: the first N
+  return lineLimitDirection === 'tail' ? entries.slice(-limitCount) : entries.slice(0, limitCount);
+}
 
-    if (!Number.isNaN(limitCount) && limitCount > 0 && limitCount < filtered.length) {
-      if (lineLimitDirection === 'tail') {
-        // Return the last N items (e.g., tail -n)
-        return filtered.slice(-limitCount);
-      } else {
-        // Return the first N items
-        return filtered.slice(0, limitCount);
-      }
-    }
-  }
-
-  return filtered;
+/**
+ * Filters log entries by level, date range, text search, and line count limit.
+ * Preserves matches within stack traces along with full entry context.
+ */
+export function filterLogEntries(
+  entries: LogEntry[],
+  options: FilterOptions
+): LogEntry[] {
+  const predicate = createEntryFilter(options);
+  // Nothing to filter: keep the same array (cheap for multi-million-record live views).
+  return applyLineLimit(predicate ? entries.filter(predicate) : entries, options);
 }
 
 export interface HighlightSegment {

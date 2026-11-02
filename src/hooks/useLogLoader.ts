@@ -4,6 +4,7 @@ import { appendInWorker, disposeWorkerSessions, parseInWorker } from '../service
 import { isGzipFileName, LogEncoding } from '../services/logDecoding';
 import { mergeLogSources } from '../services/logMerge';
 import { buildSourceLabels, isNativeFile } from '../utils/logFile';
+import { describeReadError } from '../utils/folderAccess';
 
 /** Larger files are opened by their end (the most recent records) to keep memory under control. */
 export const MAX_INITIAL_READ_BYTES = 200 * 1024 * 1024;
@@ -75,9 +76,12 @@ async function appendToFile(file: LogFileItem, current: ParsedFile): Promise<Par
   if (!read) return null;
   const delta = await appendInWorker(file.id, read.bytes);
   if (!delta) return null;
+  // One copy of the kept records (spreading both parts would copy millions of them twice).
+  const entries = current.entries.slice(0, delta.fromIndex);
+  for (const entry of delta.entries) entries.push(entry);
   return {
     ...current,
-    entries: [...current.entries.slice(0, delta.fromIndex), ...delta.entries],
+    entries,
     totalLines: delta.totalLines,
     size: read.size,
     mtime: read.mtimeMs,
@@ -148,7 +152,7 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
           } catch (err: unknown) {
             if (!isCurrent()) return;
             console.error(err);
-            failures.push(`${file.name}: ${(err as Error)?.message || 'erro desconhecido'}`);
+            failures.push(`${file.name}: ${describeReadError(err)}`);
             // Unknown stats make live polling retry this file instead of blocking the whole selection.
             parsed.set(file.id, FAILED_FILE);
           }

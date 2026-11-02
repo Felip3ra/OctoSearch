@@ -56,6 +56,21 @@ class AllowedFolders {
     this.save();
   }
 
+  list() {
+    return [...this.folders];
+  }
+
+  /** Revokes a granted folder (exact match; folders inside another granted one stay readable through it). */
+  remove(folder) {
+    const before = this.folders.length;
+    this.folders = this.folders.filter(
+      (existing) => !(isPathInside(existing, folder, this.platform) && isPathInside(folder, existing, this.platform))
+    );
+    if (this.folders.length === before) return false;
+    this.save();
+    return true;
+  }
+
   /** Grants the folders the app already knew about, only once and only before the list ever existed. */
   importKnown(folders) {
     if (this.existedAtStartup || this.imported) return false;

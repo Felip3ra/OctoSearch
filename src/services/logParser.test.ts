@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { LogParseSession, normalizeLogLevel, parseLogContentAsync } from './logParser';
+import { entryMessage, entryStackTrace, expandEntry } from './logEntry';
+import { LogEntry } from '../types';
 
-const parse = (content: string, referenceTime?: number) => parseLogContentAsync(content, undefined, { referenceTime });
+const parse = async (content: string, referenceTime?: number) => {
+  const result = await parseLogContentAsync(content, undefined, { referenceTime });
+  return { ...result, entries: result.entries.map(expandEntry) };
+};
 
 describe('normalizeLogLevel', () => {
   it('maps the usual aliases', () => {
@@ -81,10 +86,10 @@ describe('LogParseSession', () => {
   }
 
   it('produces the same records no matter how the text is split', async () => {
-    const full = (await parse(content)).entries;
+    const full = (await parseLogContentAsync(content)).entries;
     for (const size of [1, 3, 7, 20, 64]) {
       const session = new LogParseSession();
-      let entries: typeof full = [];
+      let entries: LogEntry[] = [];
       for (let index = 0; index < content.length; index += size) {
         session.push(content.slice(index, index + size));
         entries = applySnapshot(entries, session);
@@ -98,13 +103,13 @@ describe('LogParseSession', () => {
     session.push('2026-10-06 10:00:00.000 [ERR] falha\nSystem.Exception');
     let entries = applySnapshot([], session);
     expect(entries).toHaveLength(1);
-    expect(entries[0].stackTrace).toEqual(['System.Exception']);
+    expect(entryStackTrace(entries[0])).toEqual(['System.Exception']);
 
     session.push(': detalhe\n   at A.B()\n2026-10-06 10:00:01.000 [INF] ok\n');
     entries = applySnapshot(entries, session);
     expect(entries).toHaveLength(2);
-    expect(entries[0].stackTrace).toEqual(['System.Exception: detalhe', '   at A.B()']);
-    expect(entries[1].message).toBe('ok');
+    expect(entryStackTrace(entries[0])).toEqual(['System.Exception: detalhe', '   at A.B()']);
+    expect(entryMessage(entries[1])).toBe('ok');
   });
 
   it('refuses incremental appends for time-only and unrecognized logs', () => {

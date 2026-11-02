@@ -57,4 +57,16 @@ describe('AllowedFolders', () => {
     second.add('/opt/app/logs');
     expect(new AllowedFolders(store, 'linux').folders).toEqual(['/srv/logs', '/opt/app/logs']);
   });
+
+  it('revokes a folder and keeps the change on disk', () => {
+    directory = mkdtempSync(path.join(tmpdir(), 'octosearch-'));
+    const store = path.join(directory, 'allowed.json');
+    const folders = new AllowedFolders(store, 'win32');
+    folders.add('C:\\Logs\\Api');
+    folders.add('D:\\Outros');
+    expect(folders.remove('c:\\logs\\api')).toBe(true);
+    expect(folders.remove('C:\\Logs\\Api')).toBe(false);
+    expect(folders.has('C:\\Logs\\Api\\app.log')).toBe(false);
+    expect(new AllowedFolders(store, 'win32').list()).toEqual(['D:\\Outros']);
+  });
 });

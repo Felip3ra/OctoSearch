@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
 import { LogEntry, EntryLogLevel, HighlightRule, SearchPattern } from '../types';
 import { createAnyPatternMatcher, splitTextWithHighlights } from '../services/logSearch';
+import { entryMessage, entryStackTrace, entryTimestamp, hasStackTrace } from '../services/logEntry';
 import { highlightColorWithAlpha, normalizeHighlightColor } from '../utils/highlightColor';
 import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 
@@ -92,9 +93,9 @@ function getRowAppearanceClass(
 }
 
 function stackContainsSearch(entry: LogEntry, searchTerms: SearchPattern[]): boolean {
-  if (searchTerms.length === 0 || !entry.hasStackTrace) return false;
+  if (searchTerms.length === 0 || !hasStackTrace(entry)) return false;
   const matches = createAnyPatternMatcher(searchTerms);
-  return entry.stackTrace.some(matches);
+  return entryStackTrace(entry).some(matches);
 }
 
 function entryContainsAnySearchTerm(entry: LogEntry, searchTerms: SearchPattern[]): boolean {
@@ -122,7 +123,8 @@ function StackTraceDetails({
   searchTerms,
   wordWrap,
 }: Readonly<StackTraceDetailsProps>) {
-  const stackLines = entry.stackTrace.map((text, index) => ({
+  const stackTrace = entryStackTrace(entry);
+  const stackLines = stackTrace.map((text, index) => ({
     text,
     lineNumber: index,
   }));
@@ -131,9 +133,9 @@ function StackTraceDetails({
     <div className={`pl-24 pr-4 pb-2 pt-0.5 min-w-full ${wordWrap ? 'w-full' : 'w-max'}`}>
       <div className="bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 rounded p-2 text-rose-950 dark:text-rose-200 text-[11px] leading-snug">
         <div className="text-[10px] font-sans font-semibold text-rose-700 dark:text-rose-400 mb-1 select-none flex items-center justify-between">
-          <span>CONTEXTO DA EXCEÇÃO / STACK TRACE ({entry.stackTrace.length} LINHAS):</span>
+          <span>CONTEXTO DA EXCEÇÃO / STACK TRACE ({stackTrace.length} LINHAS):</span>
           {entry.endLine > entry.startLine && (
-            <span className="text-[9px] font-normal text-slate-500">Linhas {entry.endLine - entry.stackTrace.length + 1} a {entry.endLine}</span>
+            <span className="text-[9px] font-normal text-slate-500">Linhas {entry.endLine - stackTrace.length + 1} a {entry.endLine}</span>
           )}
         </div>
         <div className={`font-mono ${wordWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`}>
@@ -181,13 +183,13 @@ function EntryContextMenu({
       <button type="button" role="menuitem" onClick={() => copyAndClose(entry.rawText)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
         <Copy className="h-3.5 w-3.5" /> Copiar registro completo
       </button>
-      <button type="button" role="menuitem" onClick={() => copyAndClose(entry.message)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
+      <button type="button" role="menuitem" onClick={() => copyAndClose(entryMessage(entry))} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
         <Copy className="h-3.5 w-3.5" /> Copiar mensagem
       </button>
-      <button type="button" role="menuitem" onClick={() => copyAndClose(entry.timestamp)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
+      <button type="button" role="menuitem" onClick={() => copyAndClose(entryTimestamp(entry))} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
         <Copy className="h-3.5 w-3.5" /> Copiar data e hora
       </button>
-      {entry.hasStackTrace && (
+      {hasStackTrace(entry) && (
         <button type="button" role="menuitem" onClick={() => { onToggle(); onClose(); }} className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-800">
           {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           {isExpanded ? 'Recolher exceção' : 'Expandir exceção'}
@@ -223,6 +225,7 @@ function PrimaryLogLine({
   onCopy,
 }: Readonly<PrimaryLogLineProps>) {
   const widthClass = wordWrap ? 'w-full' : 'w-max';
+  const timestamp = entryTimestamp(entry);
   const lineNumberClass = highlightColor ? '' : 'text-slate-400 dark:text-slate-500';
   const timestampClass = highlightColor
     ? 'text-slate-700 dark:text-slate-200'
@@ -244,7 +247,7 @@ function PrimaryLogLine({
       </span>
 
       <div className="w-5 shrink-0 flex items-center justify-center pt-0.5">
-        {entry.hasStackTrace ? (
+        {hasStackTrace(entry) ? (
           <button
             type="button"
             onClick={onToggle}
@@ -272,8 +275,8 @@ function PrimaryLogLine({
         </span>
       )}
 
-      <span className={`w-40 sm:w-44 shrink-0 select-none truncate whitespace-nowrap text-[11px] ${timestampClass}`} title={entry.timestamp}>
-        {renderHighlightedText(entry.timestamp, searchTerms)}
+      <span className={`w-40 sm:w-44 shrink-0 select-none truncate whitespace-nowrap text-[11px] ${timestampClass}`} title={timestamp}>
+        {renderHighlightedText(timestamp, searchTerms)}
       </span>
 
       <span className={`shrink-0 w-11 text-center py-0.5 rounded text-[10px] font-bold border select-none ${styles.badge}`} title={entry.rawLevel || 'Sem nível'}>
@@ -281,14 +284,14 @@ function PrimaryLogLine({
       </span>
 
       <div className={`${messageLayoutClass} leading-relaxed pr-2 ${messageColorClass}`}>
-        {renderHighlightedText(entry.message, searchTerms)}
-        {entry.hasStackTrace && !isExpanded && (
+        {renderHighlightedText(entryMessage(entry), searchTerms)}
+        {hasStackTrace(entry) && !isExpanded && (
           <button
             type="button"
             onClick={onToggle}
             className="ml-2 inline-flex items-center gap-1 text-[10px] text-rose-600 dark:text-rose-400 underline hover:opacity-80 font-sans cursor-pointer select-none font-semibold"
           >
-            [+{entry.stackTrace.length} linhas de exceção]
+            [+{entry.stackLines} linhas de exceção]
           </button>
         )}
       </div>
@@ -359,7 +362,7 @@ export const LogEntryRow = memo(function LogEntryRow({
 
   const handleToggle = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!entry.hasStackTrace) return;
+    if (!hasStackTrace(entry)) return;
     if (onToggleExpand) {
       onToggleExpand();
     } else {
@@ -406,7 +409,7 @@ export const LogEntryRow = memo(function LogEntryRow({
         onCopy={handleCopy}
       />
 
-      {entry.hasStackTrace && isExpanded && (
+      {hasStackTrace(entry) && isExpanded && (
         <StackTraceDetails entry={entry} searchTerms={searchTerms} wordWrap={wordWrap} />
       )}
 

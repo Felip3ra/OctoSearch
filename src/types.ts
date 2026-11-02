@@ -21,19 +21,32 @@ export interface SearchFilter extends SearchPattern {
   connector?: FilterOperator;
 }
 
+/**
+ * A record as kept in memory. Millions of them can be loaded, so the timestamp, message and stack
+ * trace are not stored as copies when they are part of `rawText`: read them with the helpers in
+ * services/logEntry.ts (entryTimestamp, entryMessage, entryStackTrace).
+ */
 export interface LogEntry {
   id: number;
   startLine: number;
   endLine: number;
-  timestamp: string;
   /** Epoch milliseconds parsed from the timestamp (undefined when the line has no date). */
   time?: number;
   level: EntryLogLevel;
   rawLevel: string;
-  message: string;
-  stackTrace: string[];
+  /** The record exactly as written in the file, all of its lines. */
   rawText: string;
-  hasStackTrace: boolean;
+  /** Where the timestamp and the message sit in `rawText` (ignored when `timestamp`/`message` are set). */
+  timestampStart: number;
+  timestampEnd: number;
+  messageStart: number;
+  messageEnd: number;
+  /** Only set when the text is not a slice of `rawText` (JSON fields, rebuilt messages). */
+  timestamp?: string;
+  message?: string;
+  /** Number of stack trace lines: the last lines of `rawText`, unless `stackTrace` holds them. */
+  stackLines: number;
+  stackTrace?: string[];
   sourceFile?: string;
 }
 
@@ -140,6 +153,8 @@ export interface ElectronAPI {
   selectFolder: () => Promise<ElectronFolderResult | null>;
   importKnownFolders?: (folderPaths: string[]) => Promise<boolean>;
   readFolder: (folderPath: string) => Promise<NativeLogFile[]>;
+  listAllowedFolders?: () => Promise<string[]>;
+  revokeFolder?: (folderPath: string) => Promise<boolean>;
   readFile: (filePath: string) => Promise<FileReadResult>;
   readFileFrom?: (filePath: string, offset: number) => Promise<FileReadResult | null>;
   checkFileStats?: (filePath: string) => Promise<{ size: number; mtimeMs: number } | null>;

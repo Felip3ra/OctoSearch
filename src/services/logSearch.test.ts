@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LogEntry, SearchFilter } from '../types';
+import { compactEntry, DraftEntry } from './logEntry';
 import {
   createAnyPatternMatcher,
   filterLogEntries,
@@ -8,20 +9,14 @@ import {
   splitTextWithHighlights,
 } from './logSearch';
 
-function entry(id: number, message: string, extra: Partial<LogEntry> = {}): LogEntry {
-  return {
-    id,
-    startLine: id,
-    endLine: id,
-    timestamp: '',
-    level: 'INF',
-    rawLevel: 'INF',
-    message,
-    stackTrace: [],
-    rawText: message,
-    hasStackTrace: false,
-    ...extra,
-  };
+function entry(id: number, message: string, extra: Partial<DraftEntry> & { sourceFile?: string } = {}): LogEntry {
+  const { sourceFile, ...draft } = extra;
+  const stackTrace = draft.stackTrace ?? [];
+  const stored = compactEntry(
+    { id, startLine: id, endLine: id, timestamp: '', level: 'INF', rawLevel: 'INF', message, ...draft, stackTrace },
+    [message, ...stackTrace]
+  );
+  return sourceFile ? { ...stored, sourceFile } : stored;
 }
 
 const include = (text: string, extra: Partial<SearchFilter> = {}): SearchFilter => ({ id: text, text, mode: 'include', ...extra });
@@ -29,7 +24,7 @@ const exclude = (text: string, extra: Partial<SearchFilter> = {}): SearchFilter 
 
 const entries = [
   entry(1, 'Pedido 10 criado', { time: 1000 }),
-  entry(2, 'Pedido 11 falhou', { level: 'ERR', time: 2000, stackTrace: ['TimeoutException'], hasStackTrace: true }),
+  entry(2, 'Pedido 11 falhou', { level: 'ERR', time: 2000, stackTrace: ['TimeoutException'] }),
   entry(3, 'Cliente atualizado', { time: 3000 }),
   entry(4, 'pedido sem data'),
 ];
