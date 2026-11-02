@@ -35,11 +35,10 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 
 ## Histórico de versões
 
-### 1.1.0 — 01/11/2026
+### 1.2.0 — 02/11/2026
 
 **Novidades**
 
-- **Versão para Linux:** AppImage (qualquer distribuição, com atualização automática) e `.deb` (Ubuntu/Debian).
 - **Versão para macOS:** `.dmg` para Apple Silicon e para Intel (sem assinatura da Apple: na primeira vez, botão direito → Abrir).
 - **Linha do tempo:** gráfico de registros por intervalo, com erros e avisos; clique ou arraste para filtrar o período.
 - **Top erros:** agrupa as mensagens de erro (e, se quiser, de aviso) trocando números, IDs, GUIDs, textos entre aspas e URLs por curingas; um clique filtra o grupo ou vai para a última ocorrência.
@@ -48,6 +47,32 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 - **Avisos do sistema:** com o tempo real ligado e a janela em segundo plano, um novo erro (ou um termo escolhido nas Configurações) gera uma notificação.
 - **Logs dentro de `.zip`:** listados como se o zip fosse uma subpasta e descompactados na memória.
 - **Abrir pelo sistema:** associação com `.log` (instalador do Windows, `.deb` e macOS), "Abrir com" e linha de comando; com o app aberto, o arquivo abre na mesma janela.
+
+**Desempenho**
+
+- Metade da memória: data, mensagem e stack trace deixaram de ser cópias e viraram posições dentro do texto original do registro. Um log de 200 MB (2,2 milhões de registros) caiu de 1,6 GB para 0,7 GB na aba.
+- O tempo real com milhões de registros ficou quase instantâneo: busca, filtros, contagem por nível e posição das linhas processam só os registros novos. A tela travava 0,87 s a cada linha nova com um filtro ativo; agora trava ~0,05 s. Aplicar uma busca caiu de 0,95 s para 0,4 s.
+- Os registros aparecem enquanto o arquivo ainda está sendo lido: com 200 MB, os primeiros surgem em ~0,3 s e o total caiu de ~8 s para ~6 s.
+- A visão mesclada de vários arquivos também é incremental: no tempo real, só o fim da linha do tempo é refeito.
+- Pacote menor: o app leva só os idiomas pt-BR e en-US do Chromium (47 MB a menos instalado; instalador de 114 para 105 MB).
+- A busca procura no registro inteiro, como está no arquivo (data, nível, mensagem, propriedades e stack trace).
+
+**Acesso às pastas**
+
+- Pasta negada não some mais com um erro: aparece um aviso com o botão **Permitir e abrir**, também para as abas restauradas ao abrir o app.
+- **Configurações → Pastas liberadas** mostra as pastas que o app pode ler, com a opção de revogar cada uma.
+
+**Qualidade**
+
+- `App.tsx` de 1.579 para 379 linhas: o estado foi para hooks (abas, abertura de pastas, filtros, pipeline de registros, preferências) e a barra de ferramentas, os chips e os avisos viraram componentes.
+- `services/platform.ts` é o único ponto que conhece o Electron; o processo principal envia códigos de erro (`[FOLDER_DENIED]`…) e as caixas `alert()` viraram avisos dentro do app.
+- Testes novos para o formato compacto dos registros, filtro e mesclagem incrementais, linha do tempo, top erros, filtro por campo e leitura de `.zip`.
+
+### 1.1.0 — 01/11/2026
+
+**Novidades**
+
+- **Versão para Linux:** AppImage (qualquer distribuição, com atualização automática) e `.deb` (Ubuntu/Debian).
 - **Busca com expressão regular** (botão `.*`) e **diferenciando maiúsculas** (botão `Aa`). Uma expressão inválida é sinalizada antes de virar filtro.
 - **Filtro por período:** botão *Período* com De/Até e atalhos que contam a partir do registro mais recente do log.
 - **Exportar:** salva os registros visíveis em `.log` ou em `.csv` com BOM e separador `;`, prontos para o Excel.
@@ -60,18 +85,7 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 - O tempo real lê só o trecho acrescentado ao arquivo e processa só as linhas novas. Rotação ou truncamento faz o arquivo ser relido por inteiro.
 - O tempo real é avisado pelo sistema (`fs.watch`) quando o arquivo muda e ainda confere de tempos em tempos, porque esses avisos falham em pastas de rede.
 - Arquivos acima de 200 MB são abertos pelo final (os registros mais recentes), com aviso na tela.
-- Os registros aparecem enquanto o arquivo ainda está sendo lido: com 200 MB, os primeiros surgem em ~0,3 s e o total caiu de ~8 s para ~6 s.
-- A visão mesclada de vários arquivos também é incremental: no tempo real, só o fim da linha do tempo é refeito.
 - Listas com milhões de registros agora rolam até o fim (antes o navegador limitava a altura) e atualizam bem mais rápido.
-- Pacote menor: o app leva só os idiomas pt-BR e en-US do Chromium (47 MB a menos instalado; instalador de 114 para 105 MB).
-- Metade da memória: data, mensagem e stack trace deixaram de ser cópias e viraram posições dentro do texto original do registro. Um log de 200 MB (2,2 milhões de registros) caiu de 1,6 GB para 0,8 GB na aba.
-- O tempo real com milhões de registros ficou quase instantâneo: busca, filtros, contagem por nível e posição das linhas processam só os registros novos. A tela travava 0,87 s a cada linha nova com um filtro ativo; agora trava ~0,05 s. Aplicar uma busca caiu de 0,95 s para 0,4 s.
-- A busca procura no registro inteiro, como está no arquivo (data, nível, mensagem, propriedades e stack trace).
-
-**Acesso às pastas**
-
-- Pasta negada não some mais com um erro: aparece um aviso com o botão **Permitir e abrir**, também para as abas restauradas ao abrir o app.
-- **Configurações → Pastas liberadas** mostra as pastas que o app pode ler, com a opção de revogar cada uma.
 
 **Segurança**
 
