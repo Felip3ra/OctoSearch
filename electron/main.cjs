@@ -500,9 +500,14 @@ let pendingLaunchPaths = [];
 let rendererReady = false;
 
 function launchPathsFrom(argv) {
-  // No app empacotado argv[0] é o executável; no desenvolvimento, argv[1] é a pasta do projeto.
-  const args = argv.slice(app.isPackaged ? 1 : 2);
-  return args.filter((arg) => typeof arg === 'string' && arg && !arg.startsWith('-')).slice(0, 20);
+  // argv[0] é o executável. No desenvolvimento a pasta do projeto também vem nos argumentos, e nem
+  // sempre na mesma posição (o Chromium pode inserir opções antes dela): ela é descartada pelo caminho.
+  const appPath = path.resolve(app.getAppPath());
+  return argv
+    .slice(1)
+    .filter((arg) => typeof arg === 'string' && arg && !arg.startsWith('-'))
+    .filter((arg) => app.isPackaged || path.resolve(arg) !== appPath)
+    .slice(0, 20);
 }
 
 async function prepareLaunchPaths(paths) {
