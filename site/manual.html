@@ -181,7 +181,7 @@
         <h1>Manual do OctoSearch</h1>
         <p>Tudo o que o OctoSearch faz, passo a passo e com telas reais: desde abrir a primeira pasta até combinar buscas com E/OU, salvar filtros e acompanhar logs em tempo real.</p>
         <div class="meta">
-          <span class="chip">Versão 1.2.0</span>
+          <span class="chip">Versão 1.3.0</span>
           <span class="chip">Windows 10 e 11 · Linux 64 bits · macOS 11+</span>
           <span class="chip">Os exemplos usam logs fictícios de uma loja online</span>
         </div>
@@ -260,8 +260,8 @@
           <li><b class="num">4</b><span><strong>Lista de arquivos</strong>: os logs encontrados na pasta e nas subpastas. <a href="#arquivos">Ver lista de arquivos</a></span></li>
           <li><b class="num">5</b><span><strong>Busca, período e limite</strong>: incluir/excluir termos (com maiúsculas e expressão regular), filtrar por período e limitar a quantidade de registros. <a href="#busca">Ver busca</a></span></li>
           <li><b class="num">6</b><span><strong>Níveis</strong>: filtra por ERR, WRN, INF, DBG ou Outros, com a contagem de cada um. <a href="#nivel-limite">Ver níveis</a></span></li>
-          <li><b class="num">7</b><span><strong>Ferramentas</strong>: filtros salvos, marcadores, quebra de linha, tempo real, recarregar, copiar e exportar. <a href="#tempo-real">Ver ferramentas</a></span></li>
-          <li><b class="num">8</b><span><strong>Visualizador</strong>: os registros do log, com data, nível, mensagem e stack trace. <a href="#registros">Ver registros</a></span></li>
+          <li><b class="num">7</b><span><strong>Ferramentas</strong>: linha do tempo, top erros, tempo real, recarregar, copiar, exportar e o menu <strong>⋯</strong> (filtros salvos, marcadores, quebra de linha, densidade, painel de detalhes). <a href="#tempo-real">Ver ferramentas</a></span></li>
+          <li><b class="num">8</b><span><strong>Visualizador</strong>: a linha do tempo e os registros do log, com data, nível, mensagem e stack trace. <a href="#registros">Ver registros</a></span></li>
           <li><b class="num">9</b><span><strong>Prévia do log</strong>: miniatura de todo o conteúdo; clique para pular para aquele ponto.</span></li>
           <li><b class="num">10</b><span><strong>Barra de status</strong>: arquivos selecionados, tamanho, linhas e registros exibidos. <a href="#status">Ver barra de status</a></span></li>
         </ol>
@@ -293,12 +293,12 @@
         <h2 class="s"><span class="n">05</span>Pastas salvas e favoritas</h2>
         <p class="lead">O botão <strong>Pastas salvas</strong> mostra um atalho com as pastas favoritas (estrela) e as recentes (relógio).</p>
         <figure class="mid">
-          <a href="manual/04-pastas-atalho.webp" target="_blank" rel="noopener"><img src="manual/04-pastas-atalho.webp" width="1032" height="636" loading="lazy" alt="Menu rápido de pastas favoritas e recentes" /></a>
+          <a href="manual/04-pastas-atalho.webp" target="_blank" rel="noopener"><img src="manual/04-pastas-atalho.webp" width="626" height="555" loading="lazy" alt="Menu rápido de pastas favoritas e recentes" /></a>
           <figcaption>Atalho “Favoritas e recentes”: clique em uma pasta para abri-la.</figcaption>
         </figure>
         <p>Clique em <strong>Gerenciar pastas salvas…</strong> para ver a lista completa:</p>
         <figure class="mid">
-          <a href="manual/05-pastas-salvas.webp" target="_blank" rel="noopener"><img src="manual/05-pastas-salvas.webp" width="1384" height="1282" loading="lazy" alt="Janela de pastas salvas com favoritas e histórico" /></a>
+          <a href="manual/05-pastas-salvas.webp" target="_blank" rel="noopener"><img src="manual/05-pastas-salvas.webp" width="1074" height="1118" loading="lazy" alt="Janela de pastas salvas com favoritas e histórico" /></a>
           <figcaption>Pastas favoritas no topo e histórico de pastas recentes abaixo.</figcaption>
         </figure>
         <ul>
@@ -323,7 +323,7 @@
         </ul>
         <p>Clicando com o <strong>botão direito</strong> na aba, você tem mais opções:</p>
         <figure class="narrow">
-          <a href="manual/03-menu-aba.webp" target="_blank" rel="noopener"><img src="manual/03-menu-aba.webp" width="876" height="516" loading="lazy" alt="Menu de contexto de uma aba" /></a>
+          <a href="manual/03-menu-aba.webp" target="_blank" rel="noopener"><img src="manual/03-menu-aba.webp" width="488" height="374" loading="lazy" alt="Menu de contexto de uma aba" /></a>
           <figcaption>Menu da aba: ativar, alterar apelido, favoritar, copiar caminho, mostrar no Explorer e fechar.</figcaption>
         </figure>
       </section>
@@ -333,7 +333,7 @@
         <h2 class="s"><span class="n">07</span>Lista de arquivos</h2>
         <p class="lead">À esquerda ficam os arquivos de log da pasta, organizados em árvore pelas subpastas. Os arquivos marcados são os exibidos no visualizador.</p>
         <figure class="narrow">
-          <a href="manual/06-lista-arquivos.webp" target="_blank" rel="noopener"><img src="manual/06-lista-arquivos.webp" width="752" height="1160" loading="lazy" alt="Lista de arquivos em árvore com três selecionados e o menu de contexto de um arquivo" /></a>
+          <a href="manual/06-lista-arquivos.webp" target="_blank" rel="noopener"><img src="manual/06-lista-arquivos.webp" width="632" height="1115" loading="lazy" alt="Lista de arquivos em árvore com três selecionados e o menu de contexto de um arquivo" /></a>
           <figcaption>Três arquivos selecionados e o menu do botão direito sobre um arquivo.</figcaption>
         </figure>
         <h3>Selecionando arquivos</h3>
@@ -365,7 +365,7 @@
         <h2 class="s"><span class="n">08</span>Vários arquivos juntos (visão mesclada)</h2>
         <p class="lead">Quando você seleciona mais de um arquivo, os registros de todos são <strong>mesclados em ordem cronológica</strong>. É ideal para seguir uma requisição que passa por vários serviços.</p>
         <figure>
-          <a href="manual/07-visao-mesclada.webp" target="_blank" rel="noopener"><img src="manual/07-visao-mesclada.webp" width="2200" height="663" loading="lazy" alt="Registros de três arquivos mesclados por horário, cada um com uma etiqueta de cor" /></a>
+          <a href="manual/07-visao-mesclada.webp" target="_blank" rel="noopener"><img src="manual/07-visao-mesclada.webp" width="1738" height="672" loading="lazy" alt="Registros de três arquivos mesclados por horário, cada um com uma etiqueta de cor" /></a>
           <figcaption>API, gateway e worker intercalados pelo horário. Cada arquivo tem uma etiqueta com cor própria.</figcaption>
         </figure>
         <ul>
@@ -396,7 +396,7 @@
         <h3>Exceções e stack trace</h3>
         <p>Registros com stack trace mostram uma seta <code>›</code> e o link <code>[+N linhas de exceção]</code>. Clique para expandir o <strong>contexto da exceção</strong>; clique de novo para recolher.</p>
         <figure>
-          <a href="manual/12-stack-trace.webp" target="_blank" rel="noopener"><img src="manual/12-stack-trace.webp" width="2200" height="915" loading="lazy" alt="Registro de erro com a stack trace expandida e o menu do botão direito aberto" /></a>
+          <a href="manual/12-stack-trace.webp" target="_blank" rel="noopener"><img src="manual/12-stack-trace.webp" width="1738" height="752" loading="lazy" alt="Registro de erro com a stack trace expandida e o menu do botão direito aberto" /></a>
           <figcaption>Exceção expandida e o menu do botão direito sobre o registro.</figcaption>
         </figure>
         <ul>
@@ -409,6 +409,10 @@
         <h3>Painel de detalhes</h3>
         <p>Dê <strong>duplo clique</strong> num registro, tecle <kbd>Enter</kbd> com ele selecionado ou escolha <strong>Ver detalhes</strong> no botão direito. O painel à direita mostra tudo do registro: nível, arquivo e linha, data (como exibida e como está no arquivo), a mensagem completa, os <strong>campos</strong> (de registros JSON ou pares <code>chave=valor</code>), a stack trace e o registro original, cada um com botão de copiar.</p>
         <p>Ao lado de cada campo, <strong>+</strong> mostra só os registros com aquele valor e <strong>−</strong> os esconde: o OctoSearch cria o filtro <code>$campo = valor</code> para você. O painel acompanha o registro selecionado; <kbd>Esc</kbd> fecha.</p>
+        <figure>
+          <a href="manual/32-painel-detalhes.webp" target="_blank" rel="noopener"><img src="manual/32-painel-detalhes.webp" width="1738" height="765" loading="lazy" alt="Painel de detalhes de um erro com mensagem, campos order e user e a stack trace" /></a>
+          <figcaption>Os campos <code>order</code> e <code>user</code> vieram dos pares <code>chave=valor</code> da mensagem; o <strong>+</strong> filtra por eles.</figcaption>
+        </figure>
         <h3>Navegar pelo teclado e marcar registros</h3>
         <p>Clique num registro para selecioná-lo (ele ganha uma borda azul). Os atalhos partem dele, ou do primeiro registro visível:</p>
         <div class="table-wrap">
@@ -450,8 +454,8 @@
         </div>
         <p>Cada termo vira uma etiqueta (“chip”) abaixo da barra de ferramentas. No exemplo, aparecem só os registros com <span class="t-inc">timeout</span> e sem <span class="t-exc">ORD-48291</span>, e as ocorrências ficam destacadas em amarelo:</p>
         <figure>
-          <a href="manual/08-busca.webp" target="_blank" rel="noopener"><img src="manual/08-busca.webp" width="2200" height="757" loading="lazy" alt="Busca com o termo timeout incluído e ORD-48291 excluído" /></a>
-          <figcaption>“timeout” incluído, “ORD-48291” excluído: 32 de 643 registros.</figcaption>
+          <a href="manual/08-busca.webp" target="_blank" rel="noopener"><img src="manual/08-busca.webp" width="1738" height="752" loading="lazy" alt="Busca com o termo timeout incluído e ORD-48291 excluído" /></a>
+          <figcaption>“timeout” incluído, “ORD-48291” excluído: 17 de 960 registros. O termo também aparece destacado dentro da stack trace, que já abre expandida.</figcaption>
         </figure>
         <ul>
           <li><strong>Trocar entre incluir e excluir</strong>: clique no texto do chip.</li>
@@ -470,7 +474,7 @@
           </table>
         </div>
         <figure>
-          <a href="manual/21-maiusculas-regex.webp" target="_blank" rel="noopener"><img src="manual/21-maiusculas-regex.webp" width="1739" height="528" loading="lazy" alt="Um termo em expressão regular e outro diferenciando maiúsculas, ligados por OU" /></a>
+          <a href="manual/21-maiusculas-regex.webp" target="_blank" rel="noopener"><img src="manual/21-maiusculas-regex.webp" width="1738" height="528" loading="lazy" alt="Um termo em expressão regular e outro diferenciando maiúsculas, ligados por OU" /></a>
           <figcaption>Os chips mostram <code>.*</code> (expressão regular) e <code>Aa</code> (maiúsculas) antes do texto.</figcaption>
         </figure>
         <p>Se a expressão regular for inválida, a caixa fica vermelha e os botões Incluir/Excluir ficam desativados até você corrigir; passe o mouse sobre a caixa para ver o motivo.</p>
@@ -487,7 +491,7 @@
           </table>
         </div>
         <figure>
-          <a href="manual/30-filtro-por-campo.webp" target="_blank" rel="noopener"><img src="manual/30-filtro-por-campo.webp" width="1739" height="528" loading="lazy" alt="Filtro por campo $Elapsed maior que 3000 com a linha do tempo dos resultados" /></a>
+          <a href="manual/30-filtro-por-campo.webp" target="_blank" rel="noopener"><img src="manual/30-filtro-por-campo.webp" width="1738" height="528" loading="lazy" alt="Filtro por campo $Elapsed maior que 3000 com a linha do tempo dos resultados" /></a>
           <figcaption><code>$Elapsed &gt; 3000</code>: só as requisições lentas.</figcaption>
         </figure>
         <ul>
@@ -506,7 +510,7 @@
           <li><span class="t-and">E</span>: o registro precisa ter <em>os dois</em> termos.</li>
         </ul>
         <figure>
-          <a href="manual/09-e-ou.webp" target="_blank" rel="noopener"><img src="manual/09-e-ou.webp" width="1560" height="140" loading="lazy" alt="Termos agrupados em blocos E, ligados por OU" /></a>
+          <a href="manual/09-e-ou.webp" target="_blank" rel="noopener"><img src="manual/09-e-ou.webp" width="1738" height="64" loading="lazy" alt="Termos agrupados em blocos E, ligados por OU" /></a>
           <figcaption>(payment <span class="t-and">E</span> timeout) <strong>OU</strong> 502 <strong>OU</strong> (worker <span class="t-and">E</span> retrying).</figcaption>
         </figure>
         <p>O <span class="t-and">E</span> sempre agrupa antes do <strong>OU</strong>, e os termos ligados por <span class="t-and">E</span> aparecem juntos dentro de uma moldura roxa tracejada. Assim você vê exatamente como a busca é lida:</p>
@@ -541,14 +545,14 @@
           <figcaption>“15 min” preenche o campo De com 15 minutos antes do último registro.</figcaption>
         </figure>
         <figure>
-          <a href="manual/23-periodo-aplicado.webp" target="_blank" rel="noopener"><img src="manual/23-periodo-aplicado.webp" width="1739" height="480" loading="lazy" alt="Chip de período ativo acima dos registros filtrados" /></a>
+          <a href="manual/23-periodo-aplicado.webp" target="_blank" rel="noopener"><img src="manual/23-periodo-aplicado.webp" width="1738" height="480" loading="lazy" alt="Chip de período ativo acima dos registros filtrados" /></a>
           <figcaption>O período ativo aparece como chip; clique nele para removê-lo.</figcaption>
         </figure>
         <p>Enquanto o período estiver ativo, registros sem data (cabeçalhos, arquivos em formato não reconhecido) ficam ocultos.</p>
         <h3 id="linha-do-tempo">Linha do tempo</h3>
         <p>Acima dos registros, a <strong>linha do tempo</strong> mostra quantos registros há em cada intervalo, com os erros em vermelho e os avisos em amarelo. É o jeito mais rápido de ver <em>quando</em> algo começou a dar errado. Ela respeita a busca e o nível, então mostra a distribuição do que você está procurando.</p>
         <figure>
-          <a href="manual/27-linha-do-tempo.webp" target="_blank" rel="noopener"><img src="manual/27-linha-do-tempo.webp" width="1739" height="571" loading="lazy" alt="Linha do tempo com barras por intervalo de 5 minutos e um pico de erros" /></a>
+          <a href="manual/27-linha-do-tempo.webp" target="_blank" rel="noopener"><img src="manual/27-linha-do-tempo.webp" width="1738" height="555" loading="lazy" alt="Linha do tempo com barras por intervalo de 5 minutos e um pico de erros" /></a>
           <figcaption>Cada barra vale 5 minutos; o pico vermelho no meio é uma sequência de pagamentos recusados.</figcaption>
         </figure>
         <ul>
@@ -557,7 +561,7 @@
           <li><strong>Limpar período</strong> volta a mostrar tudo. O botão <strong>Linha do tempo</strong>, na barra de ferramentas, esconde ou mostra o gráfico.</li>
         </ul>
         <figure>
-          <a href="manual/28-periodo-pela-linha-do-tempo.webp" target="_blank" rel="noopener"><img src="manual/28-periodo-pela-linha-do-tempo.webp" width="1739" height="571" loading="lazy" alt="Período selecionado arrastando sobre a linha do tempo" /></a>
+          <a href="manual/28-periodo-pela-linha-do-tempo.webp" target="_blank" rel="noopener"><img src="manual/28-periodo-pela-linha-do-tempo.webp" width="1738" height="555" loading="lazy" alt="Período selecionado arrastando sobre a linha do tempo" /></a>
           <figcaption>Arrastar sobre o pico filtra das 11:00 às 11:34.</figcaption>
         </figure>
         <h3>Limitar a quantidade</h3>
@@ -567,7 +571,7 @@
           <li><strong>Primeiros</strong>: os registros do início do log.</li>
         </ul>
         <figure>
-          <a href="manual/11-nivel-e-limite.webp" target="_blank" rel="noopener"><img src="manual/11-nivel-e-limite.webp" width="2200" height="606" loading="lazy" alt="Nível ERR selecionado e limite de 100 últimos registros" /></a>
+          <a href="manual/11-nivel-e-limite.webp" target="_blank" rel="noopener"><img src="manual/11-nivel-e-limite.webp" width="1738" height="608" loading="lazy" alt="Nível ERR selecionado e limite de 100 últimos registros" /></a>
           <figcaption>Nível ERR e “Últimos 100 registros”: os dois aparecem como chips e podem ser removidos pelo ×.</figcaption>
         </figure>
         <p>Um registro conta como um só, mesmo que tenha várias linhas de stack trace. Nível, período, limite e busca valem juntos e ficam guardados em cada aba.</p>
@@ -578,7 +582,7 @@
         <h2 class="s"><span class="n">13</span>Filtros salvos</h2>
         <p class="lead">Guarde combinações de busca que você usa sempre, como “erros de pagamento” ou “retentativas do worker”, e aplique de novo com um clique.</p>
         <figure class="mid">
-          <a href="manual/10-filtros-salvos.webp" target="_blank" rel="noopener"><img src="manual/10-filtros-salvos.webp" width="1384" height="1280" loading="lazy" alt="Janela de filtros salvos organizada por grupos" /></a>
+          <a href="manual/10-filtros-salvos.webp" target="_blank" rel="noopener"><img src="manual/10-filtros-salvos.webp" width="1074" height="976" loading="lazy" alt="Janela de filtros salvos organizada por grupos" /></a>
           <figcaption>Filtros organizados nos grupos “Homologação”, “Produção” e “Sem grupo”.</figcaption>
         </figure>
         <h3>Salvar os filtros atuais</h3>
@@ -604,8 +608,8 @@
         <h2 class="s"><span class="n">14</span>Marcadores coloridos</h2>
         <p class="lead">Marcadores destacam com uma cor as linhas que contêm um texto, <em>sem esconder</em> as demais. São úteis para enxergar padrões no meio de muito log.</p>
         <figure class="mid">
-          <a href="manual/13-marcadores.webp" target="_blank" rel="noopener"><img src="manual/13-marcadores.webp" width="1384" height="754" loading="lazy" alt="Janela de marcadores de linha com três regras" /></a>
-          <figcaption>Três marcadores: “timeout” em laranja, “Circuit breaker” em roxo e “retrying” em azul.</figcaption>
+          <a href="manual/13-marcadores.webp" target="_blank" rel="noopener"><img src="manual/13-marcadores.webp" width="1074" height="565" loading="lazy" alt="Janela de marcadores de linha com três regras" /></a>
+          <figcaption>Três marcadores: “timeout” em laranja, “ORD-” em roxo e “retrying” em azul.</figcaption>
         </figure>
         <ol class="steps">
           <li>Abra o menu <strong>⋯</strong> na barra de ferramentas e escolha <strong>Marcadores coloridos</strong>.</li>
@@ -613,7 +617,7 @@
           <li>Clique em <strong>Adicionar</strong>.</li>
         </ol>
         <figure>
-          <a href="manual/14-marcadores-aplicados.webp" target="_blank" rel="noopener"><img src="manual/14-marcadores-aplicados.webp" width="2200" height="867" loading="lazy" alt="Registros destacados nas cores de cada marcador" /></a>
+          <a href="manual/14-marcadores-aplicados.webp" target="_blank" rel="noopener"><img src="manual/14-marcadores-aplicados.webp" width="1738" height="762" loading="lazy" alt="Registros destacados nas cores de cada marcador" /></a>
           <figcaption>As linhas marcadas ganham fundo e borda na cor da regra.</figcaption>
         </figure>
         <ul>
@@ -629,11 +633,11 @@
         <h2 class="s"><span class="n">15</span>Quebra de linha</h2>
         <p class="lead">Mensagens longas ficam cortadas na largura da tela. <strong>Quebrar linhas</strong>, no menu <strong>⋯</strong> (ou <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>W</kbd>), mostra o texto completo em várias linhas.</p>
         <figure>
-          <a href="manual/15a-sem-quebra.webp" target="_blank" rel="noopener"><img src="manual/15a-sem-quebra.webp" width="2200" height="434" loading="lazy" alt="Mensagens longas cortadas na borda" /></a>
+          <a href="manual/15a-sem-quebra.webp" target="_blank" rel="noopener"><img src="manual/15a-sem-quebra.webp" width="1288" height="432" loading="lazy" alt="Mensagens longas cortadas na borda" /></a>
           <figcaption>Sem quebra: as mensagens são cortadas na borda (é possível rolar para o lado).</figcaption>
         </figure>
         <figure>
-          <a href="manual/15b-com-quebra.webp" target="_blank" rel="noopener"><img src="manual/15b-com-quebra.webp" width="2200" height="552" loading="lazy" alt="Mensagens longas quebradas em duas linhas" /></a>
+          <a href="manual/15b-com-quebra.webp" target="_blank" rel="noopener"><img src="manual/15b-com-quebra.webp" width="1288" height="544" loading="lazy" alt="Mensagens longas quebradas em duas linhas" /></a>
           <figcaption>Com quebra: a mensagem inteira fica visível.</figcaption>
         </figure>
       </section>
@@ -642,8 +646,8 @@
       <section id="tempo-real">
         <h2 class="s"><span class="n">16</span>Tempo real, copiar e exportar</h2>
         <figure>
-          <a href="manual/16-ferramentas.webp" target="_blank" rel="noopener"><img src="manual/16-ferramentas.webp" width="1739" height="62" loading="lazy" alt="Barra de ferramentas" /></a>
-          <figcaption>Níveis e ferramentas. Na versão atual, Filtros salvos, Marcadores e Quebrar linhas ficam no menu ⋯.</figcaption>
+          <a href="manual/16-ferramentas.webp" target="_blank" rel="noopener"><img src="manual/16-ferramentas.webp" width="1738" height="62" loading="lazy" alt="Barra de ferramentas" /></a>
+          <figcaption>Níveis e ferramentas: Linha do tempo, Top erros, Tempo real, Auto-rolar, Recarregar, Copiar, Exportar, o menu ⋯ e Configurações.</figcaption>
         </figure>
         <div class="table-wrap">
           <table>
@@ -657,7 +661,7 @@
           </table>
         </div>
         <figure class="mid">
-          <a href="manual/24-exportar.webp" target="_blank" rel="noopener"><img src="manual/24-exportar.webp" width="773" height="309" loading="lazy" alt="Menu Exportar com as opções Texto e Planilha" /></a>
+          <a href="manual/24-exportar.webp" target="_blank" rel="noopener"><img src="manual/24-exportar.webp" width="600" height="296" loading="lazy" alt="Menu Exportar com as opções Texto e Planilha" /></a>
           <figcaption>O menu mostra quantos registros serão exportados.</figcaption>
         </figure>
         <h3 id="notificacoes">Avisos do sistema</h3>
@@ -673,7 +677,7 @@
       <section id="status">
         <h2 class="s"><span class="n">17</span>Barra de status</h2>
         <figure>
-          <a href="manual/17-barra-de-status.webp" target="_blank" rel="noopener"><img src="manual/17-barra-de-status.webp" width="2200" height="57" loading="lazy" alt="Barra de status" /></a>
+          <a href="manual/17-barra-de-status.webp" target="_blank" rel="noopener"><img src="manual/17-barra-de-status.webp" width="2200" height="45" loading="lazy" alt="Barra de status" /></a>
         </figure>
         <ul>
           <li><strong>Arquivos selecionados</strong> e o tamanho total deles.</li>
@@ -689,8 +693,8 @@
         <h2 class="s"><span class="n">18</span>Configurações e tema</h2>
         <p class="lead">Abra pela engrenagem no canto superior direito ou com <kbd>Ctrl</kbd> + <kbd>,</kbd>.</p>
         <figure class="narrow">
-          <a href="manual/18-configuracoes.webp" target="_blank" rel="noopener"><img src="manual/18-configuracoes.webp" width="1064" height="1432" loading="lazy" alt="Janela de configurações" /></a>
-          <figcaption>Aparência, ordenação dos arquivos e a lista de atalhos.</figcaption>
+          <a href="manual/18-configuracoes.webp" target="_blank" rel="noopener"><img src="manual/18-configuracoes.webp" width="818" height="1190" loading="lazy" alt="Janela de configurações" /></a>
+          <figcaption>Aparência (tema, quebra de linha e densidade) e ordenação dos arquivos; mais abaixo vêm as notificações, as pastas liberadas e os atalhos.</figcaption>
         </figure>
         <ul>
           <li><strong>Tema</strong> e <strong>Quebra de linha</strong>: mostram o estado atual.</li>
@@ -720,6 +724,10 @@
         <div class="note">
           <p><strong>Paleta de comandos (<kbd>Ctrl</kbd> + <kbd>K</kbd>):</strong> digite o que quer fazer, como “top erros”, “período 1 hora”, “próximo erro”, o nome de uma pasta salva ou de um filtro salvo, e tecle <kbd>Enter</kbd>. Acentos e maiúsculas não importam. As setas escolhem entre os resultados.</p>
         </div>
+        <figure class="mid">
+          <a href="manual/33-paleta-comandos.webp" target="_blank" rel="noopener"><img src="manual/33-paleta-comandos.webp" width="920" height="238" loading="lazy" alt="Paleta de comandos buscando por erro" /></a>
+          <figcaption>Digitando “erro”: Próximo erro, Erro anterior, Top erros…</figcaption>
+        </figure>
         <div class="table-wrap">
           <table>
             <tr><th>Atalho</th><th>Ação</th></tr>
@@ -773,7 +781,7 @@
         <h3>Formato não reconhecido</h3>
         <p>Se nenhuma linha de um arquivo seguir um formato conhecido, o OctoSearch avisa e mostra o arquivo <strong>linha a linha</strong>, sem data e nível. A busca, os marcadores e a cópia continuam funcionando normalmente.</p>
         <figure>
-          <a href="manual/19-formato-nao-reconhecido.webp" target="_blank" rel="noopener"><img src="manual/19-formato-nao-reconhecido.webp" width="2200" height="833" loading="lazy" alt="Aviso de formato de log não reconhecido com as linhas exibidas uma a uma" /></a>
+          <a href="manual/19-formato-nao-reconhecido.webp" target="_blank" rel="noopener"><img src="manual/19-formato-nao-reconhecido.webp" width="1738" height="832" loading="lazy" alt="Aviso de formato de log não reconhecido com as linhas exibidas uma a uma" /></a>
           <figcaption>Um relatório em texto livre: as 5 linhas aparecem no nível “Outros”.</figcaption>
         </figure>
       </section>

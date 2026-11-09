@@ -35,7 +35,7 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 
 ## Histórico de versões
 
-### Próxima versão (ainda não publicada)
+### 1.3.0 — 09/11/2026
 
 **Layout**
 
@@ -51,6 +51,11 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 **Correção**
 
 - A altura real das linhas (35 px) não batia com a usada para posicioná-las (34 px), e a diferença se acumulava na rolagem. Agora as duas vêm da mesma constante.
+- O menu do botão direito de um registro aparecia longe do clique (ou fora da tela) com a lista rolada.
+
+**Manual e site**
+
+- Todas as imagens do manual e do site refeitas com a interface atual, mais o painel de detalhes e a paleta de comandos.
 
 ### 1.2.0 — 02/11/2026
 

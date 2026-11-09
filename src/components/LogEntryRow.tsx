@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { LogEntry, EntryLogLevel, HighlightRule, SearchPattern } from '../types';
 import { createAnyPatternMatcher, splitTextWithHighlights } from '../services/logSearch';
 import { entryDisplayTime, entryMessage, entryStackTrace, entryTimestamp, hasStackTrace } from '../services/logEntry';
@@ -449,7 +450,7 @@ export const LogEntryRow = memo(function LogEntryRow({
         event.preventDefault();
         setContextMenu({
           x: Math.min(event.clientX, window.innerWidth - 220),
-          y: Math.min(event.clientY, window.innerHeight - 175),
+          y: Math.min(event.clientY, window.innerHeight - 230),
         });
       }}
       onClick={() => onActivate?.(entry.id)}
@@ -478,7 +479,9 @@ export const LogEntryRow = memo(function LogEntryRow({
         <StackTraceDetails entry={entry} searchTerms={searchTerms} wordWrap={wordWrap} />
       )}
 
-      {contextMenu && (
+      {/* Rendered in <body>: the virtual list moves rows with a transform, and position: fixed
+          inside a transformed element is relative to it, not to the window. */}
+      {contextMenu && createPortal(
         <EntryContextMenu
           entry={entry}
           position={contextMenu}
@@ -488,7 +491,8 @@ export const LogEntryRow = memo(function LogEntryRow({
           onToggleBookmark={onToggleBookmark ? () => onToggleBookmark(entry) : undefined}
           onOpenDetails={onOpenDetails ? () => onOpenDetails(entry) : undefined}
           onClose={() => setContextMenu(null)}
-        />
+        />,
+        document.body
       )}
     </div>
   );
