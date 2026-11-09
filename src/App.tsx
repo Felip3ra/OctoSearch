@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FolderOpen } from 'lucide-react';
-import { LogFileItem, SavedFilter } from './types';
+import { AlignJustify, Bookmark, FolderOpen, Highlighter, PanelLeftOpen, PanelRight, WrapText } from 'lucide-react';
+import { LogEntry, LogFileItem, SavedFilter } from './types';
 import { getSourceColor } from './services/logMerge';
 import { buildExport, ExportFormat, exportFileName, saveExport } from './services/logExport';
 import { capabilities } from './services/platform';
@@ -33,8 +33,14 @@ import { ActionToolbar } from './components/ActionToolbar';
 import { FilterChips } from './components/FilterChips';
 import { ViewerHeader } from './components/ViewerHeader';
 import { DeniedFoldersNotice, Notice } from './components/Notice';
+import { RecordDetailsPanel } from './components/RecordDetailsPanel';
+import { PanelResizer } from './components/PanelResizer';
+import { CommandPalette } from './components/CommandPalette';
+import { buildCommands } from './components/appCommands';
+import { ViewerCommand } from './components/VirtualLogViewer';
+import { FILE_LIST_WIDTH } from './hooks/usePreferences';
 
-type OpenPanel = 'settings' | 'savedFilters' | 'savedFolders' | 'highlightRules' | 'errorGroups' | 'desktop' | null;
+type OpenPanel = 'settings' | 'savedFilters' | 'savedFolders' | 'highlightRules' | 'errorGroups' | 'desktop' | 'palette' | null;
 
 /**
  * Composition of the app: state lives in hooks (tabs, folders, filters, preferences, loading) and
@@ -55,6 +61,10 @@ export default function App() {
   const [copiedAll, setCopiedAll] = useState(false);
   /** Request for the viewer to scroll to a record (a new nonce repeats it). */
   const [navigateTo, setNavigateTo] = useState<{ entryId: number; nonce: number } | null>(null);
+  /** Keyboard actions of the list asked from elsewhere (command palette). */
+  const [viewerCommand, setViewerCommand] = useState<{ type: ViewerCommand; nonce: number } | null>(null);
+  const [activeEntry, setActiveEntry] = useState<LogEntry | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isLiveTailing, setIsLiveTailing] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
   const isWatching = isLiveTailing && capabilities.watchesFiles && selectedFiles.some(isNativeFile);
@@ -97,12 +107,17 @@ export default function App() {
   useAppShortcuts({
     onToggleWordWrap: useCallback(() => setWordWrap((current) => !current), [setWordWrap]),
     onOpenSettings: useCallback(() => setOpenPanel('settings'), []),
+    onOpenPalette: useCallback(() => setOpenPanel('palette'), []),
     onEscape: () => {
       if (openPanel === 'settings') setOpenPanel(null);
-      else if (openPanel === 'savedFilters') return; // the modal closes itself on Escape
+      else if (openPanel) return; // the other dialogs close themselves on Escape
       else if (searchTerm) setSearchTerm('');
+      else if (isDetailsOpen) setIsDetailsOpen(false);
     },
   });
+
+  const runViewerCommand = (type: ViewerCommand) => setViewerCommand((previous) => ({ type, nonce: (previous?.nonce ?? 0) + 1 }));
+  const openDetails = useCallback(() => setIsDetailsOpen(true), []);
 
   const handleSavedFiltersChange = (next: SavedFilter[]) => {
     setSavedFilters(next);
@@ -134,6 +149,58 @@ export default function App() {
         lastModified: Math.max(0, ...selectedFiles.map((file) => file.lastModified)),
       }
     : selectedFiles[0] || null;
+
+  const toggleFileList = () => preferences.setFileListCollapsed((current) => !current);
+  const toggleCompact = () => preferences.setCompact((current) => !current);
+  const moreItems = [
+    { label: 'Filtros salvos', icon: Bookmark, badge: savedFilters.length, disabled: !activeTab, onSelect: () => setOpenPanel('savedFilters') },
+    {
+      label: 'Marcadores coloridos',
+      icon: Highlighter,
+      badge: preferences.highlightRules.filter((rule) => rule.enabled).length,
+      onSelect: () => setOpenPanel('highlightRules'),
+    },
+    { label: 'Painel de detalhes', icon: PanelRight, checked: isDetailsOpen, shortcut: 'Enter', onSelect: () => setIsDetailsOpen((current) => !current) },
+    { label: 'Quebrar linhas', icon: WrapText, checked: preferences.wordWrap, shortcut: 'Ctrl+Shift+W', onSelect: () => setWordWrap((current) => !current) },
+    { label: 'Densidade compacta', icon: AlignJustify, checked: preferences.compact, onSelect: toggleCompact },
+    { label: 'Lista de arquivos', icon: PanelLeftOpen, checked: !preferences.fileListCollapsed, onSelect: toggleFileList },
+  ];
+
+  const commands =
+    openPanel === 'palette'
+      ? buildCommands({
+          hasTab: Boolean(activeTab),
+          hasEntries: filteredEntries.length > 0,
+          tabs: tabs.tabs,
+          savedFolders: folders.savedFolders,
+          savedFilters,
+          latestEntryTime,
+          canWatchFiles: capabilities.watchesFiles,
+          // One implementation for both the desktop and the browser folder pickers: the button's.
+          openFolder: () => document.getElementById('btn-select-folder')?.click(),
+          selectTab: tabs.setActiveTabId,
+          openSavedFolder: (path, name) => void opening.openSavedFolder(path, name),
+          applySavedFilter: filters.applySavedFilter,
+          setLevel: filters.setLevelFilter,
+          setTimeRange: filters.setTimeRange,
+          clearFilters: filters.clearAllFilters,
+          viewer: runViewerCommand,
+          toggleTimeline: () => preferences.setShowTimeline((current) => !current),
+          openErrorGroups: () => setOpenPanel('errorGroups'),
+          toggleDetails: () => setIsDetailsOpen((current) => !current),
+          toggleFileList,
+          toggleWordWrap: () => setWordWrap((current) => !current),
+          toggleCompact,
+          toggleTheme: () => preferences.setIsDarkMode((current) => !current),
+          toggleLiveTailing: () => setIsLiveTailing((current) => !current),
+          reload: loader.reload,
+          copyVisible: () => void handleCopyVisible(),
+          exportAs: (format) => void handleExport(format),
+          openSavedFilters: () => setOpenPanel('savedFilters'),
+          openHighlightRules: () => setOpenPanel('highlightRules'),
+          openSettings: () => setOpenPanel('settings'),
+        })
+      : [];
 
   let emptyTitle = 'Nenhum registro encontrado';
   let emptyDescription = filters.hasActiveFilters ? 'Nenhum registro corresponde aos filtros aplicados.' : 'O arquivo selecionado está vazio.';
@@ -191,16 +258,42 @@ export default function App() {
       )}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:flex-row">
-        <FileList
-          files={activeTab?.files ?? []}
-          rootPath={activeTab?.folderPath || ''}
-          selectedFileIds={activeTab?.selectedFileIds ?? []}
-          onSelectionChange={tabs.setSelection}
-          sourceColors={sourceInfo.colorById}
-          sortField={preferences.fileSortField}
-          sortDirection={preferences.sortDirection}
-          onOpenSortSettings={() => setOpenPanel('settings')}
-        />
+        {preferences.fileListCollapsed ? (
+          <button
+            type="button"
+            onClick={toggleFileList}
+            title="Mostrar a lista de arquivos"
+            aria-label="Mostrar a lista de arquivos"
+            className="flex w-full shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800 md:w-9 md:flex-col md:border-b-0 md:border-r md:px-0 md:py-3 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <PanelLeftOpen className="h-4 w-4 shrink-0 rotate-90 md:rotate-0" />
+            <span className="font-semibold md:hidden">Arquivos</span>
+            <span className="text-[10px] font-semibold tabular-nums">{activeTab?.files.length ?? 0}</span>
+          </button>
+        ) : (
+          <>
+            <FileList
+              files={activeTab?.files ?? []}
+              rootPath={activeTab?.folderPath || ''}
+              selectedFileIds={activeTab?.selectedFileIds ?? []}
+              onSelectionChange={tabs.setSelection}
+              sourceColors={sourceInfo.colorById}
+              sortField={preferences.fileSortField}
+              sortDirection={preferences.sortDirection}
+              onOpenSortSettings={() => setOpenPanel('settings')}
+              width={preferences.fileListWidth}
+              onCollapse={toggleFileList}
+            />
+            <PanelResizer
+              label="Largura da lista de arquivos"
+              width={preferences.fileListWidth}
+              min={FILE_LIST_WIDTH.min}
+              max={FILE_LIST_WIDTH.max}
+              initial={FILE_LIST_WIDTH.initial}
+              onChange={preferences.setFileListWidth}
+            />
+          </>
+        )}
 
         <main className="flex min-w-0 flex-1 flex-col bg-white dark:bg-slate-900">
           <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2.5 dark:border-slate-800">
@@ -209,17 +302,10 @@ export default function App() {
               levelFilter={filters.levelFilter}
               levelCounts={levelCounts}
               onLevelChange={filters.setLevelFilter}
-              hasTab={Boolean(activeTab)}
-              savedFiltersCount={savedFilters.length}
-              onOpenSavedFilters={() => setOpenPanel('savedFilters')}
-              enabledHighlightCount={preferences.highlightRules.filter((rule) => rule.enabled).length}
-              onOpenHighlightRules={() => setOpenPanel('highlightRules')}
               showTimeline={preferences.showTimeline}
               onToggleTimeline={() => preferences.setShowTimeline((current) => !current)}
               hasEntries={entries.length > 0}
               onOpenErrorGroups={() => setOpenPanel('errorGroups')}
-              wordWrap={preferences.wordWrap}
-              onToggleWordWrap={() => setWordWrap((current) => !current)}
               isLiveTailing={isLiveTailing}
               isWatching={isWatching}
               onToggleLiveTailing={() => setIsLiveTailing((current) => !current)}
@@ -233,6 +319,7 @@ export default function App() {
               copied={copiedAll}
               onCopy={handleCopyVisible}
               onExport={handleExport}
+              moreItems={moreItems}
               onOpenSettings={() => setOpenPanel('settings')}
             />
           </div>
@@ -268,7 +355,8 @@ export default function App() {
 
           {histogram && <TimelineHistogram histogram={histogram} timeFrom={filters.timeFrom} timeTo={filters.timeTo} onRangeChange={filters.setTimeRange} />}
 
-          <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
             {isLoading && (
               <div className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-sky-500/10">
                 <div className="h-full bg-sky-500 transition-[width] duration-200" style={{ width: `${loader.loadingProgress}%` }} />
@@ -287,7 +375,20 @@ export default function App() {
               navigateTo={navigateTo}
               bookmarkedKeys={bookmarkedKeys}
               onToggleBookmark={toggleBookmark}
+              compact={preferences.compact}
+              onActiveEntryChange={setActiveEntry}
+              onOpenDetails={openDetails}
+              command={viewerCommand}
             />
+          </div>
+          {isDetailsOpen && (
+            <RecordDetailsPanel
+              entry={activeEntry}
+              sourceColor={activeEntry?.sourceFile ? sourceInfo.colorByLabel.get(activeEntry.sourceFile) : undefined}
+              onAddFilter={filters.addFilterTerm}
+              onClose={() => setIsDetailsOpen(false)}
+            />
+          )}
           </div>
         </main>
       </div>
@@ -348,7 +449,7 @@ export default function App() {
         isOpen={openPanel === 'errorGroups'}
         entries={filteredEntries}
         onFilterGroup={(pattern) => {
-          filters.addRegexFilter(pattern);
+          filters.addFilterTerm(pattern, 'include', true);
           closePanel();
         }}
         onShowEntry={(entry) => {
@@ -362,6 +463,8 @@ export default function App() {
         isOpen={openPanel === 'settings'}
         isDarkMode={preferences.isDarkMode}
         wordWrap={preferences.wordWrap}
+        compact={preferences.compact}
+        onToggleCompact={toggleCompact}
         fileSortField={preferences.fileSortField}
         sortDirection={preferences.sortDirection}
         onToggleTheme={() => preferences.setIsDarkMode((current) => !current)}
@@ -374,6 +477,8 @@ export default function App() {
         onNotifyTermsChange={preferences.setNotifyTerms}
         onClose={closePanel}
       />
+
+      <CommandPalette isOpen={openPanel === 'palette'} commands={commands} onClose={closePanel} />
     </div>
   );
 }

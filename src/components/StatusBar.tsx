@@ -85,8 +85,8 @@ export function StatusBar({
   const isFiltered = searchFilters.length > 0 || levelFilter !== 'ALL' || lineLimit !== 'ALL';
 
   return (
-    <footer className="flex h-7 shrink-0 select-none items-center justify-between gap-3 overflow-x-auto overscroll-x-contain border-t border-slate-200 bg-slate-50 px-3 text-[11px] text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-      <div className="flex min-w-max items-center gap-4 sm:min-w-0 sm:flex-1">
+    <footer className="flex h-7 shrink-0 select-none items-center justify-between gap-3 overflow-hidden border-t border-slate-200 bg-slate-50 px-3 text-[11px] text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         <span className="flex min-w-0 max-w-[320px] items-center gap-1.5">
           <FileText className="h-3 w-3 shrink-0" />
           <span className="truncate font-medium text-slate-700 dark:text-slate-200" title={currentFile?.path}>
@@ -95,8 +95,8 @@ export function StatusBar({
           {currentFile && <span className="shrink-0 tabular-nums">· {formatSize(currentFile.size)}</span>}
         </span>
         <span className="hidden sm:inline"><Metric label="Linhas" value={totalLines} /></span>
-        <Metric label="Registros" value={totalEntries} />
-        <Metric label="Exibidos" value={filteredCount} highlight={isFiltered} />
+        <span className="hidden md:inline"><Metric label="Registros" value={totalEntries} /></span>
+        <span className="shrink-0"><Metric label="Exibidos" value={filteredCount} highlight={isFiltered} /></span>
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
@@ -106,8 +106,8 @@ export function StatusBar({
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
-            Tempo real
-            {lastLiveUpdate && <span className="tabular-nums text-slate-400">· {lastLiveUpdate.toLocaleTimeString('pt-BR')}</span>}
+            <span className="hidden sm:inline">Tempo real</span>
+            {lastLiveUpdate && <span className="hidden tabular-nums text-slate-400 lg:inline">· {lastLiveUpdate.toLocaleTimeString('pt-BR')}</span>}
           </span>
         )}
         {autoScroll && (

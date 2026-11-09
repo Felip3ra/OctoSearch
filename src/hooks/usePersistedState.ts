@@ -16,6 +16,16 @@ export const stringCodec: PersistedStateCodec<string> = {
   serialize: (value) => value,
 };
 
+export function numberCodec(min: number, max: number): PersistedStateCodec<number> {
+  return {
+    parse: (raw) => {
+      const value = Number(raw);
+      return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : undefined;
+    },
+    serialize: String,
+  };
+}
+
 export function enumCodec<T extends string>(allowed: readonly T[]): PersistedStateCodec<T> {
   return {
     parse: (raw) => (allowed.includes(raw as T) ? (raw as T) : undefined),

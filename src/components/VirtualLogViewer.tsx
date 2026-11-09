@@ -4,6 +4,7 @@ import { createAnyPatternMatcher } from '../services/logSearch';
 import { entryKey, entryStackTrace, hasStackTrace } from '../services/logEntry';
 import { sharedPrefixLength } from '../services/logView';
 import { LogEntryRow } from './LogEntryRow';
+import { ROW_HEIGHT } from './rowMetrics';
 import { SearchX, ArrowDown, ArrowUp, ChevronsUpDown, CornerDownLeft } from 'lucide-react';
 import { normalizeHighlightColor } from '../utils/highlightColor';
 
@@ -20,9 +21,18 @@ interface VirtualLogViewerProps {
   emptyDescription?: string;
   /** Scrolls to this record and makes it the active row (a new nonce repeats the request). */
   navigateTo?: { entryId: number; nonce: number } | null;
+  /** Shorter rows (setting "Densidade compacta"). */
+  compact?: boolean;
+  /** Reports the selected row (last clicked or navigated to), for the details panel. */
+  onActiveEntryChange?: (entry: LogEntry | null) => void;
+  onOpenDetails?: (entry: LogEntry) => void;
   bookmarkedKeys?: ReadonlySet<string>;
   onToggleBookmark?: (entry: LogEntry) => void;
+  /** Keyboard actions triggered from elsewhere (command palette); a new nonce repeats one. */
+  command?: { type: ViewerCommand; nonce: number } | null;
 }
+
+export type ViewerCommand = 'nextError' | 'previousError' | 'nextBookmark' | 'previousBookmark' | 'goToLine';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
@@ -32,7 +42,8 @@ function isTypingTarget(target: EventTarget | null): boolean {
 const floatingButtonClass =
   'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:bg-white hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white';
 
-const BASE_ROW_HEIGHT = 34;
+const BASE_ROW_HEIGHT = ROW_HEIGHT.normal;
+const COMPACT_ROW_HEIGHT = ROW_HEIGHT.compact;
 const LINE_HEIGHT_STACK = 21;
 const STACK_CONTAINER_PADDING = 38;
 const OVERSCAN = 15;
@@ -53,8 +64,8 @@ class RowLayout {
   /** Index of the first record with a stack trace (Infinity when there is none). */
   private firstException = Infinity;
 
-  compute(entries: LogEntry[], expandedIds: Set<number>, measuredHeights: Map<number, number>, wordWrap: boolean) {
-    const inputs = [expandedIds, measuredHeights, wordWrap];
+  compute(entries: LogEntry[], expandedIds: Set<number>, measuredHeights: Map<number, number>, wordWrap: boolean, rowHeight: number) {
+    const inputs = [expandedIds, measuredHeights, wordWrap, rowHeight];
     const sameInputs = inputs.every((value, index) => value === this.inputs[index]);
     const kept = sameInputs ? sharedPrefixLength(this.entries, entries) : 0;
     const positions = new Float64Array(entries.length);
@@ -69,7 +80,7 @@ class RowLayout {
     for (let i = kept; i < entries.length; i++) {
       positions[i] = currentY;
       const entry = entries[i];
-      let rowH = wordWrap ? measuredHeights.get(entry.id) || BASE_ROW_HEIGHT : BASE_ROW_HEIGHT;
+      let rowH = wordWrap ? measuredHeights.get(entry.id) || rowHeight : rowHeight;
       if (entry.stackLines > 0) {
         if (firstException === Infinity) firstException = i;
         if (!wordWrap && expandedIds.has(entry.id)) rowH += STACK_CONTAINER_PADDING + entry.stackLines * LINE_HEIGHT_STACK;
@@ -99,7 +110,12 @@ export function VirtualLogViewer({
   navigateTo,
   bookmarkedKeys,
   onToggleBookmark,
+  compact = false,
+  onActiveEntryChange,
+  onOpenDetails,
+  command,
 }: Readonly<VirtualLogViewerProps>) {
+  const rowHeight = compact ? COMPACT_ROW_HEIGHT : BASE_ROW_HEIGHT;
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(600);
@@ -178,11 +194,11 @@ export function VirtualLogViewer({
 
   useEffect(() => {
     setMeasuredHeights(new Map());
-  }, [wordWrap, entries]);
+  }, [wordWrap, entries, compact]);
 
   const handleHeightChange = useCallback((id: number, height: number) => {
     setMeasuredHeights((previous) => {
-      const roundedHeight = Math.max(BASE_ROW_HEIGHT, Math.ceil(height));
+      const roundedHeight = Math.max(COMPACT_ROW_HEIGHT, Math.ceil(height));
       if (previous.get(id) === roundedHeight) return previous;
       const next = new Map(previous);
       next.set(id, roundedHeight);
@@ -205,8 +221,8 @@ export function VirtualLogViewer({
   // Compute row heights and cumulative positions taking expansions into account
   const [rowLayout] = useState(() => new RowLayout());
   const { positions, totalHeight, hasAnyExceptions } = useMemo(
-    () => rowLayout.compute(entries, expandedIds, measuredHeights, wordWrap),
-    [rowLayout, entries, expandedIds, measuredHeights, wordWrap]
+    () => rowLayout.compute(entries, expandedIds, measuredHeights, wordWrap, rowHeight),
+    [rowLayout, entries, expandedIds, measuredHeights, wordWrap, rowHeight]
   );
 
   const scrollHeight = Math.min(totalHeight, MAX_SCROLL_HEIGHT);
@@ -487,6 +503,12 @@ export function VirtualLogViewer({
       } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') {
         event.preventDefault();
         setIsGoToLineOpen(true);
+      } else if (event.key === 'Enter' && onOpenDetails && !isTypingTarget(event.target) && !event.ctrlKey && !event.altKey) {
+        const active = entries.find((entry) => entry.id === activeId);
+        if (active) {
+          event.preventDefault();
+          onOpenDetails(active);
+        }
       } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b' && onToggleBookmark && !isTypingTarget(event.target)) {
         event.preventDefault();
         const active = entries.find((entry) => entry.id === activeId) ?? entries[firstVisibleIndex];
@@ -498,7 +520,29 @@ export function VirtualLogViewer({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [jump, bookmarkedKeys, onToggleBookmark, entries, activeId, firstVisibleIndex]);
+  }, [jump, bookmarkedKeys, onToggleBookmark, onOpenDetails, entries, activeId, firstVisibleIndex]);
+
+  // Same actions as F8, F2 and Ctrl+G, asked by the command palette.
+  useEffect(() => {
+    if (!command) return;
+    const isError = (entry: LogEntry) => entry.level === 'ERR';
+    const isMarked = (entry: LogEntry) => Boolean(bookmarkedKeys?.has(entryKey(entry)));
+    const noErrors = 'Nenhum erro (ERR) nos registros visíveis.';
+    const noMarks = 'Nenhum registro marcado. Use Ctrl+B ou o ícone de alfinete para marcar.';
+    if (command.type === 'nextError') jump(isError, 1, noErrors);
+    else if (command.type === 'previousError') jump(isError, -1, noErrors);
+    else if (command.type === 'nextBookmark') jump(isMarked, 1, noMarks);
+    else if (command.type === 'previousBookmark') jump(isMarked, -1, noMarks);
+    else setIsGoToLineOpen(true);
+    // Only a new command acts; later list updates do not repeat it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [command]);
+
+  // The selected record, for the details panel (null when it left the list).
+  const activeEntry = useMemo(() => (activeId === null ? null : entries.find((entry) => entry.id === activeId) ?? null), [entries, activeId]);
+  useEffect(() => {
+    onActiveEntryChange?.(activeEntry);
+  }, [activeEntry, onActiveEntryChange]);
 
   const scrollToTop = () => {
     if (containerRef.current) {
@@ -618,6 +662,8 @@ export function VirtualLogViewer({
                   isBookmarked={bookmarkedKeys?.has(entryKey(entry)) ?? false}
                   onActivate={setActiveId}
                   onToggleBookmark={onToggleBookmark}
+                  onOpenDetails={onOpenDetails}
+                  compact={compact}
                 />
               ))}
             </div>

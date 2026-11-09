@@ -13,7 +13,7 @@ interface TimeRangeFilterProps {
   onChange: (timeFrom: number | undefined, timeTo: number | undefined) => void;
 }
 
-const QUICK_RANGES: { label: string; minutes: number }[] = [
+export const QUICK_RANGES: { label: string; minutes: number }[] = [
   { label: '15 min', minutes: 15 },
   { label: '1 hora', minutes: 60 },
   { label: '6 horas', minutes: 6 * 60 },
@@ -35,7 +35,7 @@ function fromLocalInputValue(value: string): number | undefined {
   return Number.isFinite(time) ? time : undefined;
 }
 
-function quickRangeStart(latestTime: number | undefined, minutes: number): number {
+export function quickRangeStart(latestTime: number | undefined, minutes: number): number {
   return (latestTime ?? Date.now()) - minutes * 60 * 1000;
 }
 

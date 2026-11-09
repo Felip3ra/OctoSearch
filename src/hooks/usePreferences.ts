@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { FileSortField, HighlightRule, SortDirection } from '../types';
 import { normalizeHighlightColor } from '../utils/highlightColor';
-import { booleanCodec, enumCodec, PersistedStateCodec, stringCodec, usePersistedState } from './usePersistedState';
+import { booleanCodec, enumCodec, numberCodec, PersistedStateCodec, stringCodec, usePersistedState } from './usePersistedState';
 
 const highlightRulesCodec: PersistedStateCodec<HighlightRule[]> = {
   parse: (raw) => {
@@ -34,6 +34,8 @@ const themeCodec: PersistedStateCodec<boolean> = {
 };
 const fileSortFieldCodec = enumCodec<FileSortField>(['name', 'createdAt', 'lastModified']);
 const sortDirectionCodec = enumCodec<SortDirection>(['asc', 'desc']);
+export const FILE_LIST_WIDTH = { min: 200, max: 560, initial: 288 };
+const fileListWidthCodec = numberCodec(FILE_LIST_WIDTH.min, FILE_LIST_WIDTH.max);
 
 /** User preferences kept between sessions (localStorage). The theme is also applied to the page. */
 export function usePreferences() {
@@ -48,6 +50,9 @@ export function usePreferences() {
   }, [isDarkMode]);
 
   const [wordWrap, setWordWrap] = usePersistedState('log-viewer-word-wrap', false, booleanCodec);
+  const [compact, setCompact] = usePersistedState('log-viewer-compact', false, booleanCodec);
+  const [fileListWidth, setFileListWidth] = usePersistedState('log-viewer-file-list-width', FILE_LIST_WIDTH.initial, fileListWidthCodec);
+  const [fileListCollapsed, setFileListCollapsed] = usePersistedState('log-viewer-file-list-collapsed', false, booleanCodec);
   const [showTimeline, setShowTimeline] = usePersistedState('log-viewer-show-timeline', true, booleanCodec);
   const [notifyErrors, setNotifyErrors] = usePersistedState('log-viewer-notify-errors', false, booleanCodec);
   const [notifyTerms, setNotifyTerms] = usePersistedState('log-viewer-notify-terms', '', stringCodec);
@@ -58,6 +63,9 @@ export function usePreferences() {
   return {
     isDarkMode, setIsDarkMode,
     wordWrap, setWordWrap,
+    compact, setCompact,
+    fileListWidth, setFileListWidth,
+    fileListCollapsed, setFileListCollapsed,
     showTimeline, setShowTimeline,
     notifyErrors, setNotifyErrors,
     notifyTerms, setNotifyTerms,

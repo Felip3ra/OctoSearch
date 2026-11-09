@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Copy, ExternalLink,
   FileText, Folder, FolderOpen, Layers, ListChecks, Minus, Search,
-  SlidersHorizontal, SquareMousePointer, X,
+  PanelLeftClose, SlidersHorizontal, SquareMousePointer, X,
 } from 'lucide-react';
 import { FileSortField, LogFileItem, SortDirection } from '../types';
 import { sortFiles } from '../utils/fileSorter';
@@ -17,6 +17,9 @@ interface FileListProps {
   sortField: FileSortField;
   sortDirection: SortDirection;
   onOpenSortSettings: () => void;
+  /** Width on desktop layouts (the user resizes it by dragging the border). */
+  width?: number;
+  onCollapse?: () => void;
 }
 
 interface FolderNode {
@@ -107,7 +110,7 @@ function Checkbox({ state, color }: Readonly<{ state: CheckState; color?: string
 
 export function FileList({
   files, rootPath = '', selectedFileIds, onSelectionChange, sourceColors,
-  sortField, sortDirection, onOpenSortSettings,
+  sortField, sortDirection, onOpenSortSettings, width, onCollapse,
 }: Readonly<FileListProps>) {
   const [fileSearch, setFileSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -345,7 +348,10 @@ export function FileList({
   const targetPath = contextFile?.path || contextFolder?.absolutePath || '';
 
   return (
-    <aside className="flex h-52 w-full shrink-0 select-none flex-col border-b border-slate-200 bg-slate-50 md:h-auto md:w-72 md:border-b-0 md:border-r dark:border-slate-800 dark:bg-slate-900/60">
+    <aside
+      className="flex h-52 w-full shrink-0 select-none flex-col border-b border-slate-200 bg-slate-50 md:h-auto md:w-[var(--file-list-width)] md:border-b-0 md:border-r dark:border-slate-800 dark:bg-slate-900/60"
+      style={{ '--file-list-width': `${width ?? 288}px` } as React.CSSProperties}
+    >
       <div className="flex items-center justify-between px-3 pb-1.5 pt-3">
         <div className="flex items-baseline gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Arquivos</span>
@@ -361,6 +367,17 @@ export function FileList({
           <span>{sortLabel}</span>
           {sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
         </button>
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            title="Recolher a lista de arquivos"
+            aria-label="Recolher a lista de arquivos"
+            className="rounded-md p-1 text-slate-500 hover:bg-slate-200/70 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <PanelLeftClose className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="px-3 pb-2">

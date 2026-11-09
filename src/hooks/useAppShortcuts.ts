@@ -3,12 +3,13 @@ import { useEffect } from 'react';
 interface AppShortcuts {
   onToggleWordWrap: () => void;
   onOpenSettings: () => void;
+  onOpenPalette: () => void;
   /** Esc: closes the settings, or clears the text typed in the search box. */
   onEscape: () => void;
 }
 
-/** Window-wide shortcuts: Ctrl+F (search), Ctrl+Shift+W (word wrap), Ctrl+, (settings) and Esc. */
-export function useAppShortcuts({ onToggleWordWrap, onOpenSettings, onEscape }: AppShortcuts) {
+/** Window-wide shortcuts: Ctrl+F (search), Ctrl+K (commands), Ctrl+Shift+W (word wrap), Ctrl+, (settings) and Esc. */
+export function useAppShortcuts({ onToggleWordWrap, onOpenSettings, onOpenPalette, onEscape }: AppShortcuts) {
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       const control = event.ctrlKey || event.metaKey;
@@ -18,6 +19,9 @@ export function useAppShortcuts({ onToggleWordWrap, onOpenSettings, onEscape }: 
       } else if (control && event.shiftKey && event.key.toLowerCase() === 'w') {
         event.preventDefault();
         onToggleWordWrap();
+      } else if (control && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        onOpenPalette();
       } else if (control && event.key === ',') {
         event.preventDefault();
         onOpenSettings();
@@ -27,5 +31,5 @@ export function useAppShortcuts({ onToggleWordWrap, onOpenSettings, onEscape }: 
     };
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [onToggleWordWrap, onOpenSettings, onEscape]);
+  }, [onToggleWordWrap, onOpenSettings, onOpenPalette, onEscape]);
 }

@@ -68,9 +68,12 @@ export function useTabFilters(activeTab: FolderTab | null, updateActiveTab: (upd
     });
   };
 
-  /** Adds a regular-expression term (used by "Top erros" to show one group). */
-  const addRegexFilter = (pattern: string) =>
-    updateActiveTab((tab) => ({ ...tab, searchFilters: [...(tab.searchFilters || []), { id: newFilterId(), text: pattern, mode: 'include', regex: true }] }));
+  /** Adds a ready-made term: a regex from "Top erros" or a `$campo = valor` from the details panel. */
+  const addFilterTerm = (text: string, mode: SearchMode, regex = false) =>
+    updateActiveTab((tab) => ({
+      ...tab,
+      searchFilters: [...(tab.searchFilters || []), { id: newFilterId(), text, mode, ...(regex ? { regex } : {}) }],
+    }));
 
   const removeSearchFilter = (filterId: string) =>
     updateActiveTab((tab) => ({ ...tab, searchFilters: (tab.searchFilters || []).filter((filter) => filter.id !== filterId) }));
@@ -127,7 +130,7 @@ export function useTabFilters(activeTab: FolderTab | null, updateActiveTab: (upd
     highlightTerms, includeBlocks, excludeFilters, hasActiveFilters,
     setSearchTerm, toggleSearchRegex, toggleSearchCaseSensitive, setTimeRange, setLevelFilter,
     setLineLimit, setCustomLineLimit, setLineLimitDirection,
-    addSearchFilter, addRegexFilter, removeSearchFilter, toggleSearchFilterMode, toggleConnector,
+    addSearchFilter, addFilterTerm, removeSearchFilter, toggleSearchFilterMode, toggleConnector,
     applySavedFilter, clearAllFilters,
   };
 }

@@ -349,6 +349,8 @@
           </table>
         </div>
         <p>Ao abrir uma pasta, o OctoSearch já seleciona o log mais recente de cada subpasta.</p>
+        <h3>Largura e recolher</h3>
+        <p>Arraste a borda entre a lista e os registros para deixá-la mais larga ou mais estreita (duplo clique na borda volta ao tamanho padrão). O botão ao lado de <strong>Nome</strong> recolhe a lista numa faixa estreita, deixando a tela toda para os registros; clique na faixa para mostrá-la de novo. A largura e o estado ficam salvos.</p>
         <h3>Outras opções</h3>
         <ul>
           <li><strong>Filtrar arquivos…</strong>: mostra só os arquivos cujo nome ou caminho contém o texto digitado.</li>
@@ -402,6 +404,11 @@
           <li><strong>Ícone de copiar</strong>: ao passar o mouse sobre um registro, aparece um botão que copia o registro completo.</li>
           <li>Se o termo buscado estiver <em>dentro</em> da stack trace, ela já abre expandida.</li>
         </ul>
+        <h3>Data e hora</h3>
+        <p>Todos os registros mostram a data no mesmo formato e na hora local (<code>2026-10-08 13:43:27.100</code>), qualquer que seja o formato do arquivo: assim, logs em UTC (como os JSON) e logs em hora local aparecem na ordem certa na visão mesclada. Passe o mouse sobre a data para ver como ela está escrita no arquivo. Em telas estreitas aparece só a hora.</p>
+        <h3>Painel de detalhes</h3>
+        <p>Dê <strong>duplo clique</strong> num registro, tecle <kbd>Enter</kbd> com ele selecionado ou escolha <strong>Ver detalhes</strong> no botão direito. O painel à direita mostra tudo do registro: nível, arquivo e linha, data (como exibida e como está no arquivo), a mensagem completa, os <strong>campos</strong> (de registros JSON ou pares <code>chave=valor</code>), a stack trace e o registro original, cada um com botão de copiar.</p>
+        <p>Ao lado de cada campo, <strong>+</strong> mostra só os registros com aquele valor e <strong>−</strong> os esconde: o OctoSearch cria o filtro <code>$campo = valor</code> para você. O painel acompanha o registro selecionado; <kbd>Esc</kbd> fecha.</p>
         <h3>Navegar pelo teclado e marcar registros</h3>
         <p>Clique num registro para selecioná-lo (ele ganha uma borda azul). Os atalhos partem dele, ou do primeiro registro visível:</p>
         <div class="table-wrap">
@@ -577,7 +584,7 @@
         <h3>Salvar os filtros atuais</h3>
         <ol class="steps">
           <li>Monte a busca: termos, conectores <span class="t-and">E</span>/<strong>OU</strong> e, se quiser, um nível.</li>
-          <li>Clique em <strong>Filtros salvos</strong> na barra de ferramentas.</li>
+          <li>Abra o menu <strong>⋯</strong> na barra de ferramentas e escolha <strong>Filtros salvos</strong>.</li>
           <li>Em <strong>Filtros atuais</strong> aparece o resumo do que será salvo. Dê um <strong>Nome</strong> e, se quiser, um <strong>Grupo</strong>: o campo sugere os grupos que já existem.</li>
           <li>Clique em <strong>Salvar</strong>. Se já existir um filtro com o mesmo nome no mesmo grupo, o botão vira <strong>Substituir</strong> e o filtro antigo é atualizado.</li>
         </ol>
@@ -601,7 +608,7 @@
           <figcaption>Três marcadores: “timeout” em laranja, “Circuit breaker” em roxo e “retrying” em azul.</figcaption>
         </figure>
         <ol class="steps">
-          <li>Clique em <strong>Marcadores</strong> na barra de ferramentas.</li>
+          <li>Abra o menu <strong>⋯</strong> na barra de ferramentas e escolha <strong>Marcadores coloridos</strong>.</li>
           <li>Digite o <strong>texto contido na linha</strong>, escolha a <strong>cor</strong> e, se precisar, marque <strong>Diferenciar maiúsculas</strong>.</li>
           <li>Clique em <strong>Adicionar</strong>.</li>
         </ol>
@@ -613,14 +620,14 @@
           <li><strong>Caixa verde</strong>: ativa ou desativa a regra sem apagá-la.</li>
           <li><strong>Quadrado de cor</strong>: troca a cor.</li>
           <li><strong>Setas</strong>: mudam a prioridade. Se uma linha combinar com mais de uma regra, vale a <em>primeira</em> da lista.</li>
-          <li>Os marcadores ativos aparecem como chips ao lado dos filtros, e o botão <strong>Marcadores</strong> mostra quantos estão ativos.</li>
+          <li>Os marcadores ativos aparecem como chips ao lado dos filtros, e o item <strong>Marcadores coloridos</strong> do menu <strong>⋯</strong> mostra quantos estão ativos.</li>
         </ul>
       </section>
 
       <!-- 15 -->
       <section id="quebra">
         <h2 class="s"><span class="n">15</span>Quebra de linha</h2>
-        <p class="lead">Mensagens longas ficam cortadas na largura da tela. O botão <strong>Quebrar linhas</strong> (ou <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>W</kbd>) mostra o texto completo em várias linhas.</p>
+        <p class="lead">Mensagens longas ficam cortadas na largura da tela. <strong>Quebrar linhas</strong>, no menu <strong>⋯</strong> (ou <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>W</kbd>), mostra o texto completo em várias linhas.</p>
         <figure>
           <a href="manual/15a-sem-quebra.webp" target="_blank" rel="noopener"><img src="manual/15a-sem-quebra.webp" width="2200" height="434" loading="lazy" alt="Mensagens longas cortadas na borda" /></a>
           <figcaption>Sem quebra: as mensagens são cortadas na borda (é possível rolar para o lado).</figcaption>
@@ -636,7 +643,7 @@
         <h2 class="s"><span class="n">16</span>Tempo real, copiar e exportar</h2>
         <figure>
           <a href="manual/16-ferramentas.webp" target="_blank" rel="noopener"><img src="manual/16-ferramentas.webp" width="1739" height="62" loading="lazy" alt="Barra de ferramentas" /></a>
-          <figcaption>Níveis e ferramentas: Filtros salvos, Marcadores, Quebrar linhas, Tempo real, Auto-rolar, Recarregar, Copiar e Exportar.</figcaption>
+          <figcaption>Níveis e ferramentas. Na versão atual, Filtros salvos, Marcadores e Quebrar linhas ficam no menu ⋯.</figcaption>
         </figure>
         <div class="table-wrap">
           <table>
@@ -645,6 +652,7 @@
             <tr><td><strong>Auto-rolar</strong></td><td>Aparece com o tempo real ligado. Ativo, a tela acompanha a última linha conforme o log cresce; pausado, mantém sua posição para você ler com calma.</td></tr>
             <tr><td><strong>Recarregar</strong> (setas circulares)</td><td>Lê os arquivos selecionados de novo, na hora.</td></tr>
             <tr><td><strong>Copiar</strong></td><td>Copia para a área de transferência todos os registros que estão visíveis, já com busca e filtros aplicados. Ótimo para colar num chamado ou num e-mail.</td></tr>
+            <tr><td><strong>⋯</strong> (Mais opções)</td><td>Filtros salvos e marcadores coloridos (com quantos existem), painel de detalhes, quebra de linha, densidade compacta e mostrar/recolher a lista de arquivos. Os rótulos dos botões só aparecem em janelas largas; passe o mouse para ver o nome.</td></tr>
             <tr><td><strong>Exportar</strong></td><td>Salva os registros visíveis num arquivo: <strong>Texto (.log)</strong>, igual ao original, ou <strong>Planilha (.csv)</strong>, com colunas de arquivo, linha, data/hora, nível, mensagem e stack trace, pronta para abrir no Excel.</td></tr>
           </table>
         </div>
@@ -686,6 +694,7 @@
         </figure>
         <ul>
           <li><strong>Tema</strong> e <strong>Quebra de linha</strong>: mostram o estado atual.</li>
+          <li><strong>Densidade compacta</strong>: linhas mais baixas, para ver mais registros de uma vez (também no menu ⋯).</li>
           <li><strong>Ordenar por</strong>: nome, data de criação ou última modificação dos arquivos.</li>
           <li><strong>Direção</strong>: crescente (mais antigos primeiro) ou decrescente (mais recentes primeiro).</li>
           <li><strong>Pastas liberadas</strong> (só no aplicativo desktop): as pastas que o OctoSearch tem permissão para ler. Veja abaixo.</li>
@@ -708,6 +717,9 @@
       <!-- 19 -->
       <section id="atalhos">
         <h2 class="s"><span class="n">19</span>Atalhos de teclado</h2>
+        <div class="note">
+          <p><strong>Paleta de comandos (<kbd>Ctrl</kbd> + <kbd>K</kbd>):</strong> digite o que quer fazer, como “top erros”, “período 1 hora”, “próximo erro”, o nome de uma pasta salva ou de um filtro salvo, e tecle <kbd>Enter</kbd>. Acentos e maiúsculas não importam. As setas escolhem entre os resultados.</p>
+        </div>
         <div class="table-wrap">
           <table>
             <tr><th>Atalho</th><th>Ação</th></tr>
@@ -724,6 +736,8 @@
             <tr><td><kbd>Ctrl</kbd> + <kbd>B</kbd></td><td>Marcar / desmarcar o registro selecionado</td></tr>
             <tr><td><kbd>F2</kbd> / <kbd>Shift</kbd> + <kbd>F2</kbd></td><td>Próximo / anterior registro marcado</td></tr>
             <tr><td><kbd>Ctrl</kbd> + <kbd>G</kbd></td><td>Ir para uma linha</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Paleta de comandos: qualquer ação, aba, pasta salva ou filtro salvo pelo nome</td></tr>
+            <tr><td><kbd>Enter</kbd> ou duplo clique (no registro)</td><td>Abrir o painel de detalhes</td></tr>
             <tr><td><kbd>F5</kbd> ou <kbd>Ctrl</kbd> + <kbd>R</kbd></td><td>Recarregar a janela (as abas abertas são restauradas)</td></tr>
             <tr><td>Duplo clique na aba</td><td>Alterar o apelido da pasta</td></tr>
             <tr><td>Botão direito</td><td>Menus de aba, arquivo, subpasta e registro</td></tr>

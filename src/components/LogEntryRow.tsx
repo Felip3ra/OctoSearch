@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
 import { LogEntry, EntryLogLevel, HighlightRule, SearchPattern } from '../types';
 import { createAnyPatternMatcher, splitTextWithHighlights } from '../services/logSearch';
-import { entryMessage, entryStackTrace, entryTimestamp, hasStackTrace } from '../services/logEntry';
+import { entryDisplayTime, entryMessage, entryStackTrace, entryTimestamp, hasStackTrace } from '../services/logEntry';
 import { highlightColorWithAlpha, normalizeHighlightColor } from '../utils/highlightColor';
-import { ChevronDown, ChevronRight, Copy, Check, Pin } from 'lucide-react';
+import { ROW_BORDER, ROW_HEIGHT } from './rowMetrics';
+import { ChevronDown, ChevronRight, Copy, Check, PanelRight, Pin } from 'lucide-react';
 
 interface LogEntryRowProps {
   entry: LogEntry;
@@ -19,6 +20,10 @@ interface LogEntryRowProps {
   isBookmarked?: boolean;
   onActivate?: (id: number) => void;
   onToggleBookmark?: (entry: LogEntry) => void;
+  /** Opens the details panel (double click, Enter or the context menu). */
+  onOpenDetails?: (entry: LogEntry) => void;
+  /** Shorter rows: less padding and line height. Must match the row height used by the list. */
+  compact?: boolean;
 }
 
 const LEVEL_STYLES: Record<EntryLogLevel, { badge: string; text: string; rowBg: string }> = {
@@ -162,6 +167,7 @@ interface EntryContextMenuProps {
   isBookmarked: boolean;
   onToggle: () => void;
   onToggleBookmark?: () => void;
+  onOpenDetails?: () => void;
   onClose: () => void;
 }
 
@@ -172,6 +178,7 @@ function EntryContextMenu({
   isBookmarked,
   onToggle,
   onToggleBookmark,
+  onOpenDetails,
   onClose,
 }: Readonly<EntryContextMenuProps>) {
   const copyAndClose = (text: string) => {
@@ -189,6 +196,11 @@ function EntryContextMenu({
       <div className="truncate border-b border-slate-100 px-3 py-1.5 font-mono text-[10px] text-slate-400 dark:border-slate-800">
         Linha {entry.startLine}{entry.sourceFile ? ` · ${entry.sourceFile}` : ''}
       </div>
+      {onOpenDetails && (
+        <button type="button" role="menuitem" onClick={() => { onOpenDetails(); onClose(); }} className="flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left font-medium hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-800">
+          <PanelRight className="h-3.5 w-3.5" /> Ver detalhes <kbd className="ml-auto font-mono text-[10px] text-slate-400">Enter</kbd>
+        </button>
+      )}
       <button type="button" role="menuitem" onClick={() => copyAndClose(entry.rawText)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
         <Copy className="h-3.5 w-3.5" /> Copiar registro completo
       </button>
@@ -223,6 +235,7 @@ interface PrimaryLogLineProps {
   sourceColor?: string;
   copied: boolean;
   isBookmarked: boolean;
+  compact: boolean;
   onToggle: (event?: React.MouseEvent) => void;
   onCopy: (event: React.MouseEvent) => void;
   onToggleBookmark?: (event: React.MouseEvent) => void;
@@ -238,12 +251,14 @@ function PrimaryLogLine({
   sourceColor,
   copied,
   isBookmarked,
+  compact,
   onToggle,
   onCopy,
   onToggleBookmark,
 }: Readonly<PrimaryLogLineProps>) {
   const widthClass = wordWrap ? 'w-full' : 'w-max';
-  const timestamp = entryTimestamp(entry);
+  const timestamp = entryDisplayTime(entry);
+  const originalTimestamp = entryTimestamp(entry);
   const lineNumberClass = highlightColor ? '' : 'text-slate-400 dark:text-slate-500';
   const timestampClass = highlightColor
     ? 'text-slate-700 dark:text-slate-200'
@@ -256,9 +271,13 @@ function PrimaryLogLine({
     : styles.text;
 
   return (
-    <div className={`flex items-start px-2 py-1.5 gap-2 select-text min-w-full ${widthClass}`}>
+    <div
+      className={`flex items-start px-2 gap-2 select-text min-w-full ${compact ? 'py-0.5' : 'py-1.5'} ${wordWrap ? '' : 'overflow-hidden'} ${widthClass}`}
+      // Without word wrap the height is fixed and must be the one the virtual list uses (rowMetrics).
+      style={wordWrap ? undefined : { height: (compact ? ROW_HEIGHT.compact : ROW_HEIGHT.normal) - ROW_BORDER }}
+    >
       <span
-        className={`flex w-14 shrink-0 items-center justify-end gap-1 text-right select-none pr-1 ${lineNumberClass}`}
+        className={`flex w-10 shrink-0 items-center justify-end gap-1 text-right select-none pr-1 sm:w-14 ${lineNumberClass}`}
         style={highlightColor ? { color: highlightColor } : undefined}
       >
         {isBookmarked && <Pin className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label="Registro marcado" />}
@@ -286,7 +305,7 @@ function PrimaryLogLine({
 
       {entry.sourceFile && (
         <span
-          className="flex max-w-40 shrink-0 select-none items-center gap-1.5 truncate rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300"
+          className="flex w-24 shrink-0 select-none items-center gap-1.5 truncate rounded border sm:w-36 border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300"
           style={sourceColor ? { borderLeftColor: sourceColor, borderLeftWidth: 3 } : undefined}
           title={entry.sourceFile}
         >
@@ -294,15 +313,20 @@ function PrimaryLogLine({
         </span>
       )}
 
-      <span className={`w-40 sm:w-44 shrink-0 select-none truncate whitespace-nowrap text-[11px] ${timestampClass}`} title={timestamp}>
-        {renderHighlightedText(timestamp, searchTerms)}
+      <span
+        className={`w-[5.5rem] shrink-0 select-none truncate whitespace-nowrap text-[11px] tabular-nums sm:w-40 ${timestampClass}`}
+        title={originalTimestamp && originalTimestamp !== timestamp ? `No arquivo: ${originalTimestamp}` : timestamp}
+      >
+        <span className="hidden sm:inline">{renderHighlightedText(timestamp, searchTerms)}</span>
+        {/* Phones: only the time of day ("2026-10-08 13:43:27.100" → "13:43:27.100"). */}
+        <span className="sm:hidden">{entry.time !== undefined ? timestamp.slice(11) : timestamp}</span>
       </span>
 
       <span className={`shrink-0 w-11 text-center py-0.5 rounded text-[10px] font-bold border select-none ${styles.badge}`} title={entry.rawLevel || 'Sem nível'}>
         {getLevelLabel(entry)}
       </span>
 
-      <div className={`${messageLayoutClass} leading-relaxed pr-2 ${messageColorClass}`}>
+      <div className={`${messageLayoutClass} ${compact ? 'leading-snug' : 'leading-relaxed'} pr-2 ${messageColorClass}`}>
         {renderHighlightedText(entryMessage(entry), searchTerms)}
         {hasStackTrace(entry) && !isExpanded && (
           <button
@@ -355,6 +379,8 @@ export const LogEntryRow = memo(function LogEntryRow({
   isBookmarked = false,
   onActivate,
   onToggleBookmark,
+  onOpenDetails,
+  compact = false,
 }: LogEntryRowProps) {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -427,6 +453,7 @@ export const LogEntryRow = memo(function LogEntryRow({
         });
       }}
       onClick={() => onActivate?.(entry.id)}
+      onDoubleClick={() => onOpenDetails?.(entry)}
       title={highlightRule ? `Marcador: contém “${highlightRule.text}”` : undefined}
       style={highlightStyle}
       className={`border-b text-xs font-mono transition-colors group ${rowAppearanceClass} ${isActive ? 'outline outline-2 -outline-offset-2 outline-sky-500/70' : ''}`}
@@ -441,6 +468,7 @@ export const LogEntryRow = memo(function LogEntryRow({
         sourceColor={sourceColor}
         copied={copied}
         isBookmarked={isBookmarked}
+        compact={compact}
         onToggle={handleToggle}
         onCopy={handleCopy}
         onToggleBookmark={onToggleBookmark ? (event) => { event.stopPropagation(); onToggleBookmark(entry); } : undefined}
@@ -458,6 +486,7 @@ export const LogEntryRow = memo(function LogEntryRow({
           isBookmarked={isBookmarked}
           onToggle={handleToggle}
           onToggleBookmark={onToggleBookmark ? () => onToggleBookmark(entry) : undefined}
+          onOpenDetails={onOpenDetails ? () => onOpenDetails(entry) : undefined}
           onClose={() => setContextMenu(null)}
         />
       )}

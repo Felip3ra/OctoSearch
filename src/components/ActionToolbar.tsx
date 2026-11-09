@@ -1,26 +1,20 @@
-import { ArrowDown, BarChart3, Bookmark, Check, Copy, Highlighter, ListOrdered, RefreshCw, Settings, WrapText } from 'lucide-react';
+import { ArrowDown, BarChart3, Check, Copy, ListOrdered, RefreshCw, Settings } from 'lucide-react';
 import { LogLevel } from '../types';
 import { LevelCounts } from '../services/logView';
 import { ExportFormat } from '../services/logExport';
 import { capabilities } from '../services/platform';
 import { ExportMenu } from './ExportMenu';
+import { MoreMenu, MoreMenuItem } from './MoreMenu';
 import { activeButtonClass, LEVEL_OPTIONS, neutralButtonClass, toolbarButtonClass } from './toolbarStyles';
 
 interface ActionToolbarProps {
   levelFilter: LogLevel;
   levelCounts: LevelCounts;
   onLevelChange: (level: LogLevel) => void;
-  hasTab: boolean;
-  savedFiltersCount: number;
-  onOpenSavedFilters: () => void;
-  enabledHighlightCount: number;
-  onOpenHighlightRules: () => void;
   showTimeline: boolean;
   onToggleTimeline: () => void;
   hasEntries: boolean;
   onOpenErrorGroups: () => void;
-  wordWrap: boolean;
-  onToggleWordWrap: () => void;
   isLiveTailing: boolean;
   /** Live view is on and the selection has disk files to watch. */
   isWatching: boolean;
@@ -35,6 +29,8 @@ interface ActionToolbarProps {
   copied: boolean;
   onCopy: () => void;
   onExport: (format: ExportFormat) => Promise<boolean>;
+  /** Less used actions, in the "⋯" menu. */
+  moreItems: MoreMenuItem[];
   onOpenSettings: () => void;
 }
 
@@ -43,12 +39,15 @@ function liveTitle(isLiveTailing: boolean): string {
   return isLiveTailing ? 'Tempo real ativo: os arquivos selecionados são recarregados quando mudam no disco' : 'Ativar acompanhamento em tempo real';
 }
 
-/** Second toolbar row: level filter with counts, and the tools (saved filters, timeline, live view, export…). */
+/**
+ * Second toolbar row: level filter with counts and the most used tools. Labels only show on wide
+ * windows; the rest of the tools live in the "⋯" menu, so the row fits without scrolling.
+ */
 export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
-  const { levelFilter, levelCounts, isWatching, isLiveTailing, autoScroll, wordWrap, showTimeline } = props;
+  const { levelFilter, levelCounts, isWatching, isLiveTailing, autoScroll, showTimeline } = props;
   return (
-    <div className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
-      <div role="radiogroup" aria-label="Filtrar por nível" className="flex shrink-0 rounded-md bg-slate-100 p-0.5 dark:bg-slate-800">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div role="radiogroup" aria-label="Filtrar por nível" className="flex max-w-full shrink-0 overflow-x-auto overscroll-x-contain rounded-md bg-slate-100 p-0.5 dark:bg-slate-800">
         {LEVEL_OPTIONS.map((option) => {
           const isActive = levelFilter === option.value;
           return (
@@ -58,7 +57,7 @@ export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
               role="radio"
               aria-checked={isActive}
               onClick={() => props.onLevelChange(option.value)}
-              className={`flex h-7 cursor-pointer items-center gap-1.5 rounded px-2 text-[11px] font-semibold transition-colors ${
+              className={`flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded px-2 text-[11px] font-semibold transition-colors ${
                 isActive
                   ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-slate-50'
                   : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
@@ -72,34 +71,7 @@ export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
         })}
       </div>
 
-      <div className="ml-auto flex min-w-max items-center gap-0.5">
-        <button
-          type="button"
-          onClick={props.onOpenSavedFilters}
-          disabled={!props.hasTab}
-          title="Salvar os filtros atuais ou aplicar um filtro salvo"
-          className={`${toolbarButtonClass} ${neutralButtonClass}`}
-        >
-          <Bookmark className="h-3.5 w-3.5" />
-          <span className="hidden lg:inline">Filtros salvos</span>
-          {props.savedFiltersCount > 0 && (
-            <span className="rounded-full bg-slate-200 px-1.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-200">{props.savedFiltersCount}</span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={props.onOpenHighlightRules}
-          title="Configurar marcadores que destacam linhas por texto"
-          className={`${toolbarButtonClass} ${props.enabledHighlightCount > 0 ? 'text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40' : neutralButtonClass}`}
-        >
-          <Highlighter className="h-3.5 w-3.5" />
-          <span className="hidden lg:inline">Marcadores</span>
-          {props.enabledHighlightCount > 0 && (
-            <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">{props.enabledHighlightCount}</span>
-          )}
-        </button>
-
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-0.5">
         <button
           type="button"
           onClick={props.onToggleTimeline}
@@ -108,7 +80,7 @@ export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
           className={`${toolbarButtonClass} ${showTimeline ? activeButtonClass : neutralButtonClass}`}
         >
           <BarChart3 className="h-3.5 w-3.5" />
-          <span className="hidden xl:inline">Linha do tempo</span>
+          <span className="hidden 2xl:inline">Linha do tempo</span>
         </button>
 
         <button
@@ -119,18 +91,7 @@ export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
           className={`${toolbarButtonClass} ${neutralButtonClass}`}
         >
           <ListOrdered className="h-3.5 w-3.5 text-rose-500" />
-          <span className="hidden xl:inline">Top erros</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={props.onToggleWordWrap}
-          title="Alternar quebra de linha (Ctrl+Shift+W)"
-          aria-pressed={wordWrap}
-          className={`${toolbarButtonClass} ${wordWrap ? activeButtonClass : neutralButtonClass}`}
-        >
-          <WrapText className="h-3.5 w-3.5" />
-          <span className="hidden lg:inline">Quebrar linhas</span>
+          <span className="hidden 2xl:inline">Top erros</span>
         </button>
 
         <span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" />
@@ -160,7 +121,7 @@ export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
             className={`${toolbarButtonClass} ${autoScroll ? activeButtonClass : neutralButtonClass}`}
           >
             <ArrowDown className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Auto-rolar</span>
+            <span className="hidden 2xl:inline">Auto-rolar</span>
           </button>
         )}
 
@@ -182,7 +143,7 @@ export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
           className={`${toolbarButtonClass} ${neutralButtonClass}`}
         >
           {props.copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-          <span className="hidden lg:inline">{props.copied ? 'Copiado!' : 'Copiar'}</span>
+          <span className="hidden xl:inline">{props.copied ? 'Copiado!' : 'Copiar'}</span>
         </button>
 
         <ExportMenu
@@ -193,9 +154,14 @@ export function ActionToolbar(props: Readonly<ActionToolbarProps>) {
           onExport={props.onExport}
         />
 
-        <button type="button" onClick={props.onOpenSettings} title="Configurações (Ctrl+,)" className={`${toolbarButtonClass} ${neutralButtonClass} px-2`}>
-          <Settings className="h-3.5 w-3.5" />
-        </button>
+        <MoreMenu items={props.moreItems} buttonClassName={`${toolbarButtonClass} ${neutralButtonClass}`} />
+
+        {/* Small screens use the gear in the header, which is always visible. */}
+        <span className="hidden md:block">
+          <button type="button" onClick={props.onOpenSettings} title="Configurações (Ctrl+,)" className={`${toolbarButtonClass} ${neutralButtonClass} px-2`}>
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        </span>
       </div>
     </div>
   );

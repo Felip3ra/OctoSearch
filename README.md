@@ -35,6 +35,23 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 
 ## Histórico de versões
 
+### Próxima versão (ainda não publicada)
+
+**Layout**
+
+- **Barra de ferramentas que cabe na janela:** as ferramentas menos usadas (filtros salvos, marcadores, quebra de linha, densidade, painel de detalhes, lista de arquivos) foram para o menu **⋯**, e os rótulos só aparecem em janelas largas.
+- **Data no mesmo formato para todos os arquivos**, na hora local (logs JSON em UTC e logs em hora local ficam na ordem certa); o texto original aparece na dica.
+- **Colunas alinhadas:** a etiqueta do arquivo e a data têm largura fixa.
+- **Painel de detalhes do registro** (Enter, duplo clique ou "Ver detalhes"): mensagem, campos com botões que viram filtro `$campo = valor`, stack trace e registro original, cada um com botão de copiar.
+- **Lista de arquivos redimensionável e recolhível**, com a largura salva.
+- **Densidade compacta:** linhas de 24 px em vez de 34.
+- **Paleta de comandos (`Ctrl+K`):** qualquer ação, aba, pasta salva ou filtro salvo pelo nome, sem se importar com acentos.
+- **Responsivo:** da janela mínima (850 px) ao celular (390 px) nenhum controle sai da tela; as barras quebram em linhas, a data mostra só a hora em telas estreitas e a lista de arquivos pode ser recolhida.
+
+**Correção**
+
+- A altura real das linhas (35 px) não batia com a usada para posicioná-las (34 px), e a diferença se acumulava na rolagem. Agora as duas vêm da mesma constante.
+
 ### 1.2.0 — 02/11/2026
 
 **Novidades**
@@ -140,6 +157,8 @@ npm test           # testes (Vitest)
 npm run lint       # tipos (tsc) + oxlint
 npm run build:mac  # .dmg (só num Mac)
 ```
+
+Se `npm run desktop` falhar com `bad option`, o terminal tem a variável `ELECTRON_RUN_AS_NODE` definida (alguns editores a definem): rode `env -u ELECTRON_RUN_AS_NODE npm run desktop` ou apague a variável antes.
 
 Estrutura principal:
 

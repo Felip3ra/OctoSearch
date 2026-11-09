@@ -24,6 +24,18 @@ export function entryTimestamp(entry: LogEntry): string {
   return entry.timestamp ?? entry.rawText.slice(entry.timestampStart, entry.timestampEnd);
 }
 
+const pad = (value: number, size = 2) => String(value).padStart(size, '0');
+
+/**
+ * Date and time as shown in the list: the same local format for every file (ISO, Serilog, log4net,
+ * JSON in UTC…), so merged files read in order. Records without a date show their original text.
+ */
+export function entryDisplayTime(entry: LogEntry): string {
+  if (entry.time === undefined) return entryTimestamp(entry);
+  const date = new Date(entry.time);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+}
+
 export function entryMessage(entry: LogEntry): string {
   return entry.message ?? entry.rawText.slice(entry.messageStart, entry.messageEnd);
 }

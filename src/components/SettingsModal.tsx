@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, Bell, Files, FolderLock, Keyboard, Moon, Settings, Sun, WrapText, X } from 'lucide-react';
+import { AlignJustify, ArrowDown, ArrowUp, Bell, Files, FolderLock, Keyboard, Moon, Settings, Sun, WrapText, X } from 'lucide-react';
 import { FileSortField, SortDirection } from '../types';
 import { capabilities, desktop } from '../services/platform';
 
@@ -7,6 +7,8 @@ interface SettingsModalProps {
   isOpen: boolean;
   isDarkMode: boolean;
   wordWrap: boolean;
+  compact: boolean;
+  onToggleCompact: () => void;
   fileSortField: FileSortField;
   sortDirection: SortDirection;
   onToggleTheme: () => void;
@@ -21,6 +23,7 @@ interface SettingsModalProps {
 }
 
 const SHORTCUTS = [
+  ['Ctrl + K', 'Paleta de comandos: qualquer ação, aba, pasta ou filtro salvo'],
   ['Ctrl + F', 'Focar a pesquisa'],
   ['Enter / Shift + Enter', 'Incluir / excluir o termo pesquisado'],
   ['Esc', 'Limpar a pesquisa atual'],
@@ -32,6 +35,7 @@ const SHORTCUTS = [
   ['Ctrl + B', 'Marcar / desmarcar o registro selecionado'],
   ['F2 / Shift + F2', 'Próximo / anterior registro marcado'],
   ['Ctrl + G', 'Ir para uma linha'],
+  ['Enter / duplo clique', 'Abrir os detalhes do registro selecionado'],
   ['Ctrl + ,', 'Abrir configurações'],
 ];
 
@@ -158,6 +162,8 @@ export function SettingsModal({
   isOpen,
   isDarkMode,
   wordWrap,
+  compact,
+  onToggleCompact,
   fileSortField,
   sortDirection,
   onToggleTheme,
@@ -235,6 +241,19 @@ export function SettingsModal({
                 </span>
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${wordWrap ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
                   {wordWrap ? 'Ativada' : 'Desativada'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={onToggleCompact}
+                className="flex w-full items-center justify-between gap-3 p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <AlignJustify className="h-4 w-4" />
+                  Densidade compacta
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${compact ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                  {compact ? 'Ativada' : 'Desativada'}
                 </span>
               </button>
             </div>

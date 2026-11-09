@@ -34,19 +34,19 @@ export function parseFieldFilter(text: string): FieldFilter | null {
   return { field: match[1].toLowerCase(), operator: match[2] as FieldOperator, value };
 }
 
-function flatten(value: unknown, prefix: string, into: Map<string, string>): void {
+function flatten(value: unknown, prefix: string, into: [string, string][]): void {
   if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
     for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
       flatten(child, prefix ? `${prefix}.${key}` : key, into);
     }
     return;
   }
-  if (prefix) into.set(prefix.toLowerCase(), typeof value === 'string' ? value : JSON.stringify(value));
+  if (prefix) into.push([prefix, typeof value === 'string' ? value : JSON.stringify(value)]);
 }
 
-/** The fields of a record (lowercase names). Built on demand: nothing is stored per record. */
-export function entryFields(entry: LogEntry): Map<string, string> {
-  const fields = new Map<string, string>();
+/** The fields of a record with their names as written, in order (for display). */
+export function entryFieldList(entry: LogEntry): [string, string][] {
+  const fields: [string, string][] = [];
   const newline = entry.rawText.indexOf('\n');
   const firstLine = newline === -1 ? entry.rawText : entry.rawText.slice(0, newline);
   if (firstLine.startsWith('{')) {
@@ -57,8 +57,13 @@ export function entryFields(entry: LogEntry): Map<string, string> {
       // Not JSON after all: read it as text.
     }
   }
-  for (const match of firstLine.matchAll(KEY_VALUE_REGEX)) fields.set(match[1].toLowerCase(), unquote(match[2]));
+  for (const match of firstLine.matchAll(KEY_VALUE_REGEX)) fields.push([match[1], unquote(match[2])]);
   return fields;
+}
+
+/** The fields of a record by lowercase name, for filtering. Built on demand: nothing is stored per record. */
+export function entryFields(entry: LogEntry): Map<string, string> {
+  return new Map(entryFieldList(entry).map(([name, value]) => [name.toLowerCase(), value]));
 }
 
 function compare(actual: string | undefined, filter: FieldFilter): boolean {
