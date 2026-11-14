@@ -190,6 +190,15 @@ async function resolveAllowedLogFile(filePath) {
   return { realFile, innerName: inZip ? inZip.innerName : null };
 }
 
+/**
+ * Identifica o arquivo em disco (volume + número do arquivo). Muda quando o arquivo é trocado por outro
+ * com o mesmo nome (rotação por renomear e criar), mesmo que o novo já esteja maior que o antigo.
+ * A data de criação não serve: o Windows a reaproveita para um arquivo recriado com o mesmo nome.
+ */
+function fileIdentity(stat) {
+  return stat.ino ? `${stat.dev}:${stat.ino}` : null;
+}
+
 async function readRange(filePath, start, end) {
   const handle = await fs.promises.open(filePath, 'r');
   try {
@@ -301,6 +310,8 @@ function createWindow() {
       event.preventDefault();
     }
     if (input.key === 'F5' || (input.control && input.key.toLowerCase() === 'r')) {
+      // A tela nova volta a pedir os caminhos pendentes; até lá eles ficam na fila em vez de se perderem.
+      rendererReady = false;
       mainWindow.reload();
       event.preventDefault();
     }
@@ -385,25 +396,28 @@ ipcMain.handle('fs:readFile', async (event, filePath) => {
     // Logs inside a zip are decompressed in memory; `size` is the zip's, so a changed zip is read again.
     const content = await readZipEntry(realFile, innerName);
     const start = !/\.gz$/i.test(innerName) && content.length > MAX_INITIAL_READ_BYTES ? content.length - MAX_INITIAL_READ_BYTES : 0;
-    return { bytes: content.subarray(start), start, size: stat.size, mtimeMs: stat.mtimeMs };
+    return { bytes: content.subarray(start), start, size: stat.size, mtimeMs: stat.mtimeMs, identity: null };
   }
   const isGzip = /\.gz$/i.test(realFile);
   const start = !isGzip && stat.size > MAX_INITIAL_READ_BYTES ? stat.size - MAX_INITIAL_READ_BYTES : 0;
   const bytes = await readRange(realFile, start, stat.size);
-  return { bytes, start, size: start + bytes.length, mtimeMs: stat.mtimeMs };
+  return { bytes, start, size: start + bytes.length, mtimeMs: stat.mtimeMs, identity: fileIdentity(stat) };
 });
 
 // Leitura incremental do tempo real: devolve só o que foi acrescentado a partir de `offset`.
-// null indica que o arquivo diminuiu (rotação/truncamento) ou cresceu demais e deve ser relido por inteiro.
-ipcMain.handle('fs:readFileFrom', async (event, filePath, offset) => {
+// null indica que o arquivo diminuiu (rotação/truncamento), foi trocado por outro (`identity` diferente da
+// leitura anterior) ou cresceu demais, e deve ser relido por inteiro.
+ipcMain.handle('fs:readFileFrom', async (event, filePath, offset, identity) => {
   assertTrustedSender(event);
   if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('Parâmetro inválido: offset');
   const { realFile, innerName } = await resolveAllowedLogFile(filePath);
   if (innerName) return null;
   const stat = await fs.promises.stat(realFile);
+  const currentIdentity = fileIdentity(stat);
+  if (typeof identity === 'string' && currentIdentity && identity !== currentIdentity) return null;
   if (stat.size < offset || stat.size - offset > MAX_APPEND_READ_BYTES) return null;
   const bytes = await readRange(realFile, offset, stat.size);
-  return { bytes, start: offset, size: offset + bytes.length, mtimeMs: stat.mtimeMs };
+  return { bytes, start: offset, size: offset + bytes.length, mtimeMs: stat.mtimeMs, identity: currentIdentity };
 });
 
 // Verificação rápida de tamanho e data de modificação para o tempo real.
@@ -415,6 +429,7 @@ ipcMain.handle('fs:checkFileStats', async (event, filePath) => {
     return {
       size: stat.size,
       mtimeMs: stat.mtimeMs,
+      identity: fileIdentity(stat),
     };
   } catch {
     return null;
@@ -499,14 +514,17 @@ let pendingLaunchPaths = [];
 /** True once the window asked for the pending paths (before that they are queued). */
 let rendererReady = false;
 
-function launchPathsFrom(argv) {
+function launchPathsFrom(argv, workingDirectory = process.cwd()) {
   // argv[0] é o executável. No desenvolvimento a pasta do projeto também vem nos argumentos, e nem
   // sempre na mesma posição (o Chromium pode inserir opções antes dela): ela é descartada pelo caminho.
   const appPath = path.resolve(app.getAppPath());
   return argv
     .slice(1)
     .filter((arg) => typeof arg === 'string' && arg && !arg.startsWith('-'))
-    .filter((arg) => app.isPackaged || path.resolve(arg) !== appPath)
+    // Caminhos relativos valem para a pasta de onde o comando foi executado (numa segunda execução,
+    // a pasta dela, não a da janela que já estava aberta).
+    .map((arg) => path.resolve(workingDirectory, arg))
+    .filter((resolved) => app.isPackaged || resolved !== appPath)
     .slice(0, 20);
 }
 
@@ -554,8 +572,8 @@ const isPrimaryInstance = app.requestSingleInstanceLock();
 if (!isPrimaryInstance) {
   app.quit();
 } else {
-  app.on('second-instance', (event, argv) => {
-    void openLaunchPaths(launchPathsFrom(argv));
+  app.on('second-instance', (event, argv, workingDirectory) => {
+    void openLaunchPaths(launchPathsFrom(argv, workingDirectory || undefined));
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();

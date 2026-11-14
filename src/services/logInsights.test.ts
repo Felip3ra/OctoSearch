@@ -60,6 +60,19 @@ describe('field filters', () => {
     expect(entryFields(text.entries[0]).get('user')).toBe('u101');
     expect(entryFields(text.entries[0]).get('order')).toBe('ORD 1');
   });
+
+  it('compares as numbers only what is a number', async () => {
+    const { entries } = await parseLogContentAsync('2026-10-06 10:00:00 [INF] pedido TraceId=12ab34cd UserId=81.0 elapsed=45ms');
+    const matches = (text: string) =>
+      filterLogEntries(entries, { searchTerm: '', level: 'ALL', searchFilters: [{ id: text, text, mode: 'include' }] }).length === 1;
+    expect(matches('$TraceId = 12')).toBe(false);
+    expect(matches('$TraceId != 12')).toBe(true);
+    expect(matches('$TraceId = 12AB34CD')).toBe(true);
+    expect(matches('$TraceId > 10')).toBe(false);
+    expect(matches('$UserId = 81')).toBe(true);
+    expect(matches('$elapsed > 40')).toBe(true);
+    expect(matches('$elapsed = 45')).toBe(false);
+  });
 });
 
 describe('IncrementalHistogram', () => {

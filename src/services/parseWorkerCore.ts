@@ -14,7 +14,9 @@ export type ParseWorkerRequest =
       referenceTime: number;
     }
   | { type: 'append'; requestId: number; key: string; bytes: ArrayBuffer }
-  | { type: 'dispose'; keys: string[] };
+  | { type: 'dispose'; keys: string[] }
+  /** Stops a parse that is queued or running; nothing else is posted for it. */
+  | { type: 'cancel'; requestId: number };
 
 export type ParseWorkerResponse =
   | { type: 'progress'; requestId: number; progress: number }
@@ -43,7 +45,11 @@ export interface ParseWorkerOptions {
   partialIntervalMs?: number;
   chunkSize?: number;
   now?: () => number;
+  /** Lets waiting messages (a cancel) be delivered between two chunks of a long parse. */
+  yieldToMessages?: () => Promise<void>;
 }
+
+const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 interface Session {
   parser: LogParseSession;
@@ -58,28 +64,46 @@ interface Session {
 export class ParseWorkerCore {
   private sessions = new Map<string, Session>();
   private queue: Promise<void> = Promise.resolve();
+  /** Requests queued or running, and the ones among them that were cancelled. */
+  private active = new Set<number>();
+  private cancelled = new Set<number>();
 
   constructor(
     private readonly post: (response: ParseWorkerResponse) => void,
     private readonly options: ParseWorkerOptions = {}
   ) {}
 
-  /** Messages are handled one at a time, in order, even when one of them awaits (gzip). */
+  /**
+   * Messages are handled one at a time, in order, even when one of them awaits (gzip).
+   * A cancel skips the line: it marks its request, which stops at the next chunk (or never starts).
+   */
   handle(request: ParseWorkerRequest): Promise<void> {
+    if (request.type === 'cancel') {
+      if (this.active.has(request.requestId)) this.cancelled.add(request.requestId);
+      return Promise.resolve();
+    }
+    if (request.type !== 'dispose') this.active.add(request.requestId);
     this.queue = this.queue.then(() => this.process(request));
     return this.queue;
   }
 
-  private async process(request: ParseWorkerRequest): Promise<void> {
+  private async process(request: Exclude<ParseWorkerRequest, { type: 'cancel' }>): Promise<void> {
     if (request.type === 'dispose') {
       request.keys.forEach((key) => this.sessions.delete(key));
       return;
     }
+    const { requestId } = request;
     try {
+      if (this.cancelled.has(requestId)) return;
       if (request.type === 'parse') await this.parse(request);
       else this.append(request);
     } catch (error) {
-      this.post({ type: 'error', requestId: request.requestId, message: (error as Error)?.message || String(error) });
+      if (!this.cancelled.has(requestId)) {
+        this.post({ type: 'error', requestId, message: (error as Error)?.message || String(error) });
+      }
+    } finally {
+      this.active.delete(requestId);
+      this.cancelled.delete(requestId);
     }
   }
 
@@ -87,6 +111,7 @@ export class ParseWorkerCore {
     this.sessions.delete(request.key);
     let bytes: Uint8Array = new Uint8Array(request.bytes);
     if (request.gzip) bytes = await gunzip(bytes);
+    if (this.cancelled.has(request.requestId)) return;
 
     const { encoding, bomLength } = detectEncoding(bytes);
     let body: Uint8Array = bytes.subarray(bomLength);
@@ -95,7 +120,7 @@ export class ParseWorkerCore {
     const decoder = new TextDecoder(encoding);
     const parser = new LogParseSession({ referenceTime: request.referenceTime });
     const text = decoder.decode(body, { stream: true });
-    const { firstPartialMs = 300, partialIntervalMs = 500, chunkSize, now = Date.now } = this.options;
+    const { firstPartialMs = 300, partialIntervalMs = 500, chunkSize, now = Date.now, yieldToMessages = yieldToEventLoop } = this.options;
     let processed = 0;
     let lastProgress = -1;
     let nextPartialAt = now() + firstPartialMs;
@@ -115,6 +140,8 @@ export class ParseWorkerCore {
         const { fromIndex, entries, totalLines } = parser.snapshot();
         this.post({ type: 'partial', requestId: request.requestId, fromIndex, entries, totalLines });
       }
+      await yieldToMessages();
+      if (this.cancelled.has(request.requestId)) return;
     }
 
     const snapshot = parser.snapshot();

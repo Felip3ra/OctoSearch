@@ -12,6 +12,18 @@ export interface WorkerParseResult {
   canAppend: boolean;
 }
 
+/** Rejection of a parse stopped through its AbortSignal (the caller no longer wants the result). */
+export class ParseCancelledError extends Error {
+  constructor() {
+    super('Leitura cancelada.');
+    this.name = 'ParseCancelledError';
+  }
+}
+
+export function isParseCancelled(error: unknown): boolean {
+  return error instanceof ParseCancelledError || (error instanceof DOMException && error.name === 'AbortError');
+}
+
 interface Pending {
   resolve: (result: WorkerParseResult | null) => void;
   reject: (error: Error) => void;
@@ -99,27 +111,44 @@ function toTransferable(bytes: Uint8Array): ArrayBuffer {
 type WithoutRequestId<T> = T extends unknown ? Omit<T, 'requestId'> : never;
 
 function send(
-  request: WithoutRequestId<Exclude<ParseWorkerRequest, { type: 'dispose' }>>,
+  request: WithoutRequestId<Extract<ParseWorkerRequest, { type: 'parse' | 'append' }>>,
   onProgress?: (progress: number) => void,
-  onPartial?: (entries: LogEntry[]) => void
+  onPartial?: (entries: LogEntry[]) => void,
+  signal?: AbortSignal
 ): Promise<WorkerParseResult | null> {
+  if (signal?.aborted) return Promise.reject(new ParseCancelledError());
   const requestId = nextRequestId++;
   const message = { ...request, requestId } as ParseWorkerRequest & { requestId: number; bytes: ArrayBuffer };
   return new Promise((resolve, reject) => {
-    pending.set(requestId, { resolve, reject, onProgress, onPartial });
+    const onAbort = () => {
+      // The worker stops at its next chunk; whatever it still sends for this request is ignored.
+      if (!pending.delete(requestId)) return;
+      worker?.postMessage({ type: 'cancel', requestId } satisfies ParseWorkerRequest);
+      reject(new ParseCancelledError());
+    };
+    const settle = <T>(finish: (value: T) => void) => (value: T) => {
+      signal?.removeEventListener('abort', onAbort);
+      finish(value);
+    };
+    pending.set(requestId, { resolve: settle(resolve), reject: settle(reject), onProgress, onPartial });
+    signal?.addEventListener('abort', onAbort, { once: true });
     getWorker().postMessage(message, [message.bytes]);
   });
 }
 
-/** Parses a whole file; `onPartial` receives the records parsed so far while a large file is read. */
+/**
+ * Parses a whole file; `onPartial` receives the records parsed so far while a large file is read.
+ * Aborting `signal` stops the parse and rejects with a `ParseCancelledError`.
+ */
 export function parseInWorker(
   key: string,
   bytes: Uint8Array,
   options: { gzip: boolean; truncated: boolean; referenceTime: number },
   onProgress?: (progress: number) => void,
-  onPartial?: (entries: LogEntry[]) => void
+  onPartial?: (entries: LogEntry[]) => void,
+  signal?: AbortSignal
 ): Promise<WorkerParseResult> {
-  return send({ type: 'parse', key, bytes: toTransferable(bytes), ...options }, onProgress, onPartial) as Promise<WorkerParseResult>;
+  return send({ type: 'parse', key, bytes: toTransferable(bytes), ...options }, onProgress, onPartial, signal) as Promise<WorkerParseResult>;
 }
 
 /** Continues a parsed file with the bytes appended to it; null means it must be parsed again in full. */

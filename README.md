@@ -35,6 +35,18 @@ Manual completo, com prints: https://octosearch-omega.vercel.app/manual
 
 ## Histórico de versões
 
+### 1.3.1 — 14/11/2026
+
+**Correções**
+
+- **Logs JSON com data em número** (`"time": 1700000000000000000`): datas em segundos, milissegundos, microssegundos ou nanossegundos são reconhecidas, e um valor fora do intervalo deixa o registro sem data em vez de impedir a abertura do arquivo inteiro.
+- **Filtro por campo:** `$TraceId = 12` não encontra mais `TraceId=12ab34cd`. Igualdade só compara como número quando os dois lados são números; `>` e `<` continuam aceitando unidade (`$elapsed > 40` encontra `elapsed=45ms`).
+- **Exportação em CSV:** células que começam com `=`, `+`, `-` ou `@` ganham um apóstrofo, para o Excel não executar como fórmula um texto vindo do log.
+- **Abrir pela linha de comando com o app aberto:** caminhos relativos (`octosearch ./app.log`) valem para a pasta de onde o comando foi executado.
+- **Tempo real e rotação de arquivo:** quando o arquivo é trocado por outro com o mesmo nome, ele é relido do início, mesmo que o novo já esteja maior que o antigo.
+- **Trocar de arquivo durante uma leitura longa** interrompe a leitura anterior em vez de esperá-la terminar.
+- **F5 durante a abertura de um arquivo pelo sistema** não perde mais o arquivo pedido.
+
 ### 1.3.0 — 09/11/2026
 
 **Layout**

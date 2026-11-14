@@ -143,6 +143,8 @@ export interface FileReadResult {
   /** Byte offset where the read ended; the next live read continues from here. */
   size: number;
   mtimeMs: number;
+  /** Identifies the file on disk; it changes when the file is replaced by another one with the same name (rotation). */
+  identity?: string | null;
 }
 
 export interface LaunchPath {
@@ -163,8 +165,9 @@ export interface ElectronAPI {
   listAllowedFolders?: () => Promise<string[]>;
   revokeFolder?: (folderPath: string) => Promise<boolean>;
   readFile: (filePath: string) => Promise<FileReadResult>;
-  readFileFrom?: (filePath: string, offset: number) => Promise<FileReadResult | null>;
-  checkFileStats?: (filePath: string) => Promise<{ size: number; mtimeMs: number } | null>;
+  /** Null when the file shrank, grew too much or is no longer the one identified by `identity`. */
+  readFileFrom?: (filePath: string, offset: number, identity?: string | null) => Promise<FileReadResult | null>;
+  checkFileStats?: (filePath: string) => Promise<{ size: number; mtimeMs: number; identity?: string | null } | null>;
   watchFiles?: (filePaths: string[]) => Promise<string[]>;
   onFileChanged?: (callback: (filePath: string) => void) => () => void;
   saveTextFile?: (options: { defaultName: string; content: string }) => Promise<string | null>;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileReadResult, LogEntry, LogFileItem } from '../types';
-import { appendInWorker, disposeWorkerSessions, parseInWorker } from '../services/parserClient';
+import { appendInWorker, disposeWorkerSessions, isParseCancelled, parseInWorker } from '../services/parserClient';
 import { isGzipFileName, LogEncoding } from '../services/logDecoding';
 import { IncrementalMerger } from '../services/logMerge';
 import { buildSourceLabels, isNativeFile } from '../utils/logFile';
@@ -19,6 +19,8 @@ interface ParsedFile {
   /** Byte offset already read (the next live read continues from here); -1 after a failed read. */
   size: number;
   mtime: number;
+  /** Which file on disk was read; a different one under the same name (rotation) is read again in full. */
+  identity?: string | null;
   canAppend: boolean;
   truncated: boolean;
   encoding?: LogEncoding;
@@ -52,16 +54,19 @@ async function readLogBytes(file: LogFileItem): Promise<FileReadResult> {
 async function parseWholeFile(
   file: LogFileItem,
   onProgress?: (progress: number) => void,
-  onPartial?: (partial: ParsedFile) => void
+  onPartial?: (partial: ParsedFile) => void,
+  signal?: AbortSignal
 ): Promise<ParsedFile> {
   const read = await readLogBytes(file);
+  signal?.throwIfAborted();
   const truncated = read.start > 0;
   const result = await parseInWorker(
     file.id,
     read.bytes,
     { gzip: isGzipFileName(file.name), truncated, referenceTime: read.mtimeMs || file.lastModified },
     onProgress,
-    onPartial && ((entries) => onPartial({ ...FAILED_FILE, entries, totalLines: 0, truncated }))
+    onPartial && ((entries) => onPartial({ ...FAILED_FILE, entries, totalLines: 0, truncated })),
+    signal
   );
   return {
     entries: result.entries,
@@ -69,6 +74,7 @@ async function parseWholeFile(
     formatRecognized: result.formatRecognized,
     size: read.size,
     mtime: read.mtimeMs,
+    identity: read.identity,
     canAppend: result.canAppend && isNativeFile(file),
     truncated: read.start > 0,
     encoding: result.encoding,
@@ -79,7 +85,7 @@ async function parseWholeFile(
 async function appendToFile(file: LogFileItem, current: ParsedFile): Promise<ParsedFile | null> {
   const readFileFrom = desktop()?.readFileFrom;
   if (!readFileFrom || !current.canAppend) return null;
-  const read = await readFileFrom(file.path, current.size);
+  const read = await readFileFrom(file.path, current.size, current.identity);
   if (!read) return null;
   const delta = await appendInWorker(file.id, read.bytes);
   if (!delta) return null;
@@ -92,7 +98,13 @@ async function appendToFile(file: LogFileItem, current: ParsedFile): Promise<Par
     totalLines: delta.totalLines,
     size: read.size,
     mtime: read.mtimeMs,
+    identity: read.identity ?? current.identity,
   };
+}
+
+/** True when the file on disk is not the one that was read (same name, another file). */
+function wasReplaced(current: ParsedFile, identity: string | null | undefined): boolean {
+  return Boolean(current.identity && identity && current.identity !== identity);
 }
 
 function isUncPath(filePath: string): boolean {
@@ -114,6 +126,7 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
   const parsedFilesRef = useRef(new Map<string, ParsedFile>());
   const loadRequestRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
   const mergerRef = useRef(new IncrementalMerger());
 
   /** Rebuilds the visible timeline from the per-file parse cache. */
@@ -134,6 +147,10 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
     async (files: LogFileItem[], force = false) => {
       const requestId = ++loadRequestRef.current;
       const isCurrent = () => requestId === loadRequestRef.current;
+      // A new selection replaces the one still loading: its parse is stopped instead of running to the end.
+      loadAbortRef.current?.abort();
+      const abort = new AbortController();
+      loadAbortRef.current = abort;
       setIsLoading(true);
       setLoadingProgress(0);
       setErrorMessage(null);
@@ -163,12 +180,13 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
                 const shown = new Map(parsed);
                 shown.set(file.id, partial);
                 applyParsedFiles(files.filter((item) => shown.has(item.id)), shown);
-              }
+              },
+              abort.signal
             );
             if (!isCurrent()) return;
             parsed.set(file.id, result);
           } catch (err: unknown) {
-            if (!isCurrent()) return;
+            if (!isCurrent() || isParseCancelled(err)) return;
             console.error(err);
             failures.push(`${file.name}: ${describeDesktopError(err)}`);
             // Unknown stats make live polling retry this file instead of blocking the whole selection.
@@ -198,6 +216,7 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
   useEffect(() => {
     if (selectedFiles.length === 0) {
       loadRequestRef.current++;
+      loadAbortRef.current?.abort();
       disposeWorkerSessions([...parsedFilesRef.current.keys()]);
       parsedFilesRef.current = new Map();
       // Drop the merged copies too, or a closed selection would stay in memory.
@@ -243,10 +262,11 @@ export function useLogLoader(selectedFiles: LogFileItem[], isLiveTailing: boolea
           const stats = await checkFileStats(file.path);
           if (disposed || parsed !== parsedFilesRef.current) return;
           if (!current || !stats) continue;
-          if (stats.size === current.size && (stats.mtimeMs === current.mtime || current.canAppend)) continue;
+          const replaced = wasReplaced(current, stats.identity);
+          if (!replaced && stats.size === current.size && (stats.mtimeMs === current.mtime || current.canAppend)) continue;
 
           const next =
-            (stats.size > current.size ? await appendToFile(file, current) : null) ?? (await parseWholeFile(file));
+            (!replaced && stats.size > current.size ? await appendToFile(file, current) : null) ?? (await parseWholeFile(file));
           if (disposed || parsed !== parsedFilesRef.current) return;
           parsed.set(file.id, next);
           changed = true;

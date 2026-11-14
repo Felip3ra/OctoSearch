@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listAllowedFolders: () => ipcRenderer.invoke('fs:listAllowedFolders'),
   revokeFolder: (folderPath) => ipcRenderer.invoke('fs:revokeFolder', folderPath),
   readFile: (filePath) => ipcRenderer.invoke('fs:readFile', filePath),
-  readFileFrom: (filePath, offset) => ipcRenderer.invoke('fs:readFileFrom', filePath, offset),
+  readFileFrom: (filePath, offset, identity) => ipcRenderer.invoke('fs:readFileFrom', filePath, offset, identity),
   checkFileStats: (filePath) => ipcRenderer.invoke('fs:checkFileStats', filePath),
   watchFiles: (filePaths) => ipcRenderer.invoke('fs:watchFiles', filePaths),
   onFileChanged: (callback) => {

@@ -63,6 +63,13 @@ describe('export', () => {
     expect(buildCsv(entries, true).split('\r\n')[0]).toBe('﻿Arquivo;Linha;Data/hora;Nível;Mensagem;Stack trace');
   });
 
+  it('keeps cells that look like formulas from running in the spreadsheet', () => {
+    const rows = buildCsv([entry(1, '=HYPERLINK("http://x";"clique")', 0), entry(2, '@SUM(A1)', 0), entry(3, '-1 item', 0)], false).split('\r\n');
+    expect(rows[1]).toContain(`"'=HYPERLINK(""http://x"";""clique"")"`);
+    expect(rows[2]).toContain(";'@SUM(A1);");
+    expect(rows[3]).toContain(";'-1 item;");
+  });
+
   it('creates a safe file name', () => {
     const name = exportFileName('app:prod.log.1.gz', 'csv', new Date(2026, 9, 6, 14, 5));
     expect(name).toBe('app_prod-filtrado-20261006-1405.csv');

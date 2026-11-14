@@ -91,6 +91,32 @@ describe('ParseWorkerCore', () => {
     expect(timeline.map(entryMessage)).toEqual(lines.map((_, index) => `registro ${index}`));
   });
 
+  it('stops a running parse when it is cancelled, and skips a cancelled one still in the queue', async () => {
+    const responses: ParseWorkerResponse[] = [];
+    const lines = Array.from({ length: 6 }, (_, index) => `2026-10-06 10:00:0${index} [INF] registro ${index}`);
+    let chunks = 0;
+    const core: ParseWorkerCore = new ParseWorkerCore((response) => responses.push(response), {
+      chunkSize: 40,
+      // The cancel arrives while the first file is halfway through.
+      yieldToMessages: async () => {
+        if (++chunks === 2) void core.handle({ type: 'cancel', requestId: 1 });
+      },
+    });
+    const running = core.handle(parseRequest(`${lines.join('\n')}\n`));
+    const queued = core.handle({ ...parseRequest('2026-10-06 10:00:00 [INF] fila\n', { key: 'b' }), requestId: 2 });
+    void core.handle({ type: 'cancel', requestId: 2 });
+    const kept = core.handle({ ...parseRequest('2026-10-06 10:00:00 [INF] mantido\n', { key: 'c' }), requestId: 3 });
+    await Promise.all([running, queued, kept]);
+
+    expect(chunks).toBe(2);
+    const finished = responses.filter((response) => response.type === 'result' || response.type === 'error');
+    expect(finished).toHaveLength(1);
+    expect(finished[0]).toMatchObject({ type: 'result', requestId: 3 });
+    // The cancelled files left no session behind to continue from.
+    await core.handle({ type: 'append', requestId: 4, key: 'a', bytes: bytesOf('x\n') });
+    expect(responses.at(-1)).toEqual({ type: 'reset', requestId: 4 });
+  });
+
   it('reports errors instead of throwing', async () => {
     const { core, last } = createCore();
     await core.handle(parseRequest(bytesOf('não é gzip'), { gzip: true }));

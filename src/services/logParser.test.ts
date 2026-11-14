@@ -55,6 +55,20 @@ describe('parseLogContentAsync', () => {
     expect(result.entries[1]).toMatchObject({ level: 'ERR', message: 'Erro', stackTrace: ['Ex', ' at A'] });
   });
 
+  it('reads numeric JSON timestamps in seconds, milliseconds, microseconds and nanoseconds', async () => {
+    const result = await parse(
+      [
+        '{"time":1700000000,"msg":"s"}',
+        '{"time":1700000000000,"msg":"ms"}',
+        '{"time":1700000000000000,"msg":"us"}',
+        '{"time":1700000000000000000,"msg":"ns"}',
+        '{"time":1e300,"msg":"absurdo"}',
+      ].join('\n')
+    );
+    expect(result.entries.map((entry) => entry.time)).toEqual([1.7e12, 1.7e12, 1.7e12, 1.7e12, undefined]);
+    expect(result.entries).toHaveLength(5);
+  });
+
   it('falls back to one entry per line for unknown formats', async () => {
     const result = await parse('linha um\nlinha dois\n\nlinha três');
     expect(result.formatRecognized).toBe(false);

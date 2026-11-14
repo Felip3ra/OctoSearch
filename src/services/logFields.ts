@@ -66,18 +66,33 @@ export function entryFields(entry: LogEntry): Map<string, string> {
   return new Map(entryFieldList(entry).map(([name, value]) => [name.toLowerCase(), value]));
 }
 
+const NUMBER_REGEX = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
+const NUMBER_WITH_UNIT_REGEX = /^([-+]?(?:\d+\.?\d*|\.\d+))\s*(?:[a-zµ]{1,3}|%)?$/i;
+
+/** The value as a number, or null when it is not one. `allowUnit` accepts a short unit after it ("45ms", "80%"). */
+function toNumber(text: string, allowUnit: boolean): number | null {
+  const trimmed = text.trim();
+  if (NUMBER_REGEX.test(trimmed)) return Number(trimmed);
+  const withUnit = allowUnit ? NUMBER_WITH_UNIT_REGEX.exec(trimmed) : null;
+  return withUnit ? Number(withUnit[1]) : null;
+}
+
 function compare(actual: string | undefined, filter: FieldFilter): boolean {
   if (actual === undefined) return filter.operator === '!=';
   const { operator, value } = filter;
   if (operator === '~') return actual.toLowerCase().includes(value.toLowerCase());
-  const actualNumber = Number.parseFloat(actual);
-  const expectedNumber = Number.parseFloat(value);
-  const numeric = !Number.isNaN(actualNumber) && !Number.isNaN(expectedNumber);
   if (operator === '=' || operator === '!=') {
-    const equal = numeric && /^-?[\d.]+$/.test(value) ? actualNumber === expectedNumber : actual.toLowerCase() === value.toLowerCase();
+    // Numbers compare by value ("81" = "81.0") only when both sides are entirely numeric:
+    // an id such as "12ab34cd" is text, not the number 12.
+    const actualExact = toNumber(actual, false);
+    const expectedExact = toNumber(value, false);
+    const equal =
+      actualExact !== null && expectedExact !== null ? actualExact === expectedExact : actual.toLowerCase() === value.toLowerCase();
     return operator === '=' ? equal : !equal;
   }
-  if (!numeric) return false;
+  const actualNumber = toNumber(actual, true);
+  const expectedNumber = toNumber(value, true);
+  if (actualNumber === null || expectedNumber === null) return false;
   if (operator === '>') return actualNumber > expectedNumber;
   if (operator === '>=') return actualNumber >= expectedNumber;
   if (operator === '<') return actualNumber < expectedNumber;

@@ -11,8 +11,16 @@ export function buildLogText(entries: LogEntry[], includeSource: boolean): strin
     .join('\n');
 }
 
+/**
+ * Log messages carry text written by third parties (user agents, request parameters). A cell that
+ * starts with one of these characters is run as a formula by Excel and LibreOffice, so it gets an
+ * apostrophe in front, which makes the spreadsheet show it as text.
+ */
+const FORMULA_START_REGEX = /^[=+\-@\t\r]/;
+
 function csvCell(value: string): string {
-  return /[";\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  const safe = FORMULA_START_REGEX.test(value) ? `'${value}` : value;
+  return /[";\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 /**

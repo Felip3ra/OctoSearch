@@ -183,6 +183,23 @@ function stringify(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
+/** Largest time a Date can hold (ms); beyond it `toISOString` throws. */
+const MAX_DATE_MS = 8.64e15;
+
+/**
+ * Numeric timestamps come in seconds, milliseconds, microseconds or nanoseconds since 1970: the unit
+ * is guessed from the magnitude (each range covers dates from 1973 to past the year 5000).
+ */
+function epochToMs(value: number): number | undefined {
+  if (!Number.isFinite(value) || value < 0) return undefined;
+  let time: number;
+  if (value < 1e11) time = value * 1000;
+  else if (value < 1e14) time = value;
+  else if (value < 1e17) time = value / 1e3;
+  else time = value / 1e6;
+  return time <= MAX_DATE_MS ? time : undefined;
+}
+
 function parseJsonLine(line: string): ParsedStart | null {
   let record: unknown;
   try {
@@ -206,8 +223,8 @@ function parseJsonLine(line: string): ParsedStart | null {
   let time: number | undefined;
   let timestamp = '';
   if (typeof rawTime === 'number') {
-    time = rawTime > 1e12 ? rawTime : rawTime * 1000;
-    timestamp = new Date(time).toISOString();
+    time = epochToMs(rawTime);
+    timestamp = time === undefined ? String(rawTime) : new Date(time).toISOString();
   } else if (typeof rawTime === 'string') {
     timestamp = rawTime;
     time = matchTimestamp(rawTime)?.time ?? (Date.parse(rawTime) || undefined);
